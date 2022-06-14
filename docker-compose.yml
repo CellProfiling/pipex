@@ -1,0 +1,14 @@
+version: '3.3'
+
+services:
+
+  pipex:
+    build: .
+    container_name: pipex
+    command: python -u pipex.py 2>&1 | tee /opt/pipex/work/log.txt
+    env_file:
+      - ./.env
+    volumes:
+      - ${PIPEX_WORK}:/opt/pipex/work
+
+
