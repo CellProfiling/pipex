@@ -1,1 +1,0 @@
-pipex.sh: 8: bin/python: not found
