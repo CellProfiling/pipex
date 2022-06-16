@@ -310,7 +310,8 @@ if __name__ =='__main__':
         file_path = data_folder + '/' + file
         if os.path.isdir(file_path):
             continue
-        
+
+        next_try = False        
         try:
             with TiffFile(file_path) as tif:
                 if len(tif.series[0].pages) == 1:
@@ -327,10 +328,26 @@ if __name__ =='__main__':
                             membrane_img = page.asarray()
         except:
             print('>>> checking type of ' + file_path + ', not TIFF', flush=True)  
-            if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                nuclei_img = imread(file_path)
-            if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                membrane_img = imread(file_path)
+            next_try = True
+                
+        if next_try:
+            next_try = False
+            try:
+                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                    nuclei_img = imread(file_path)
+                if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                    membrane_img = imread(file_path)
+            except:
+                next_try = True
+
+        if next_try:
+            try:
+                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                    nuclei_img = np.array(PIL.Image.open(file_path))
+                if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                    membrane_img = np.array(PIL.Image.open(file_path))
+            except:
+                print('>>> Could not read image ' + file_path, flush=True)  
         
     #performing segmentation    
     cellLabels = cell_segmentation(nuclei_img, membrane_img)
@@ -352,6 +369,7 @@ if __name__ =='__main__':
         if os.path.isdir(file_path):
             continue
         
+        next_try = False        
         try:
             with TiffFile(file_path) as tif:
                 if len(tif.series[0].pages) == 1:
@@ -375,15 +393,37 @@ if __name__ =='__main__':
                             marker_calculation(biomarker, page.asarray(), cellLabels, data_table)
         except:
             print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)  
-            if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
-            elif membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
-            else:
-                for marker in measure_markers:
-                    if marker in file:
-                        marker_calculation(marker, imread(file), cellLabels, data_table)
-                        break
+            next_try = True
+
+        if next_try:
+            next_try = False
+            try:
+                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                    marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
+                elif membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                    marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
+                else:
+                    for marker in measure_markers:
+                        if marker in file:
+                            marker_calculation(marker, imread(file), cellLabels, data_table)
+                            break
+            except:
+                next_try = True
+
+        if next_try:
+            try:
+                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                    marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
+                elif membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                    marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
+                else:
+                    for marker in measure_markers:
+                        if marker in file:
+                            marker_calculation(marker, np.array(PIL.Image.open(file_path)), cellLabels, data_table)
+                            break
+            except:
+                print('>>> Could not read image ' + file_path, flush=True) 
+                
 
     #dumpming data_table in cell_data.csv file
     df = pd.DataFrame.from_dict(data_table, orient='index')

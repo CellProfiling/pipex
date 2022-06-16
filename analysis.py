@@ -23,6 +23,7 @@ analysis_markers = []
 cellsize_max = 0
 cellsize_min = 0
 custom_filter = "no"
+std_norm = "yes"
 log_norm = "no"
 quantile_norm = "no"
 batch_corr = ""
@@ -40,12 +41,12 @@ def rgb_to_int(rgb):
 #Function to handle the command line parameters passed
 def options(argv):
     if (len(argv) == 0):
-       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
+       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
+                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
@@ -68,6 +69,9 @@ def options(argv):
             elif arg.startswith('-log_norm='):
                 global log_norm
                 log_norm = arg[10:]
+            elif arg.startswith('-std_norm='):
+                global std_norm
+                std_norm = arg[10:]
             elif arg.startswith('-quantile_norm='):
                 global quantile_norm
                 quantile_norm = arg[15:]
@@ -145,18 +149,16 @@ if __name__ =='__main__':
             filter_set.update(df_norm[df_norm['CTNNB1'] > df_norm['CTNNB1'].quantile(.99)].index.values.tolist())
  
     df_norm = df_norm.drop(filter_set)
-    df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_filtered.csv', index=False)
         
     #We normalize all the markers through min-max        
     for marker in markers:
         df_norm[marker] = pd.to_numeric(df[marker])
         if log_norm == 'yes':
             df_norm[marker] = np.log1p(df[marker])
-        marker_min = df_norm[marker].min()
-        marker_max = df_norm[marker].max()
-        df_norm[marker] = df_norm[marker].apply(lambda x: (x - marker_min) / (marker_max - marker_min))
-        
-    df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_filtered_norm.csv', index=False)
+        if std_norm == 'yes':
+            marker_min = df_norm[marker].min()
+            marker_max = df_norm[marker].max()
+            df_norm[marker] = df_norm[marker].apply(lambda x: (x - marker_min) / (marker_max - marker_min))
     
     #Alternative normalization via z-score
     #for marker in markers:
@@ -175,13 +177,10 @@ if __name__ =='__main__':
             batch.extend([batch_id for _ in range(len(df_batch))])
         
         df_norm[markers] = pycombat(df_norm[markers].transpose(), batch).transpose()
-        
-        df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_batch_corr.csv', index=False)
-    
+            
     #Quantile normalization
     if quantile_norm == 'yes':
         df_norm[markers] = qnorm.quantile_normalize(df_norm[markers].transpose()).transpose()        
-        df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_quantile_norm.csv', index=False)
 
     df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_norm.csv', index=False)
     

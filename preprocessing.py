@@ -379,8 +379,11 @@ if __name__ =='__main__':
         if fnmatch.fnmatch(file, '*Empty.*') or fnmatch.fnmatch(file, '*Blank.*') or os.path.isdir(file_path):
             continue
 
+        next_try = False
         try:
             with TiffFile(file_path) as tif:
+                print(len(tif.series))
+                print(tif.series)
                 if len(tif.series[0].pages) == 1:
                     preprocess_image(file, next(iter(tif.series[0].pages)).asarray())
                 else:
@@ -389,7 +392,22 @@ if __name__ =='__main__':
                         preprocess_image(os.path.splitext(file)[0] + '_' + biomarker + '.tif', page.asarray())
         except:
             print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)  
-            preprocess_image(file, imread(file_path))
+            next_try = True
+
+        if next_try:
+            next_try = False
+            try:
+                np_img = imread(file_path)
+                preprocess_image(file, np_img)
+            except:
+                next_try = True
+
+        if next_try:
+            try:
+                np_img = np.array(PIL.Image.open(file_path))
+                preprocess_image(file, np_img)
+            except:
+                print('>>> Could not read image ' + file_path, flush=True)  
 
                       
     print(">>> End time preprocessing =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)

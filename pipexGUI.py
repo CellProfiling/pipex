@@ -61,6 +61,7 @@ tooltip_35 = '<optional, yes or no to apply custom Cell Profiling lab\'s biomark
 tooltip_36 = '<optional, yes or no to apply log1p normalization to the markers>: \nexample -> yes'
 tooltip_37 = '<optional, yes or no to apply quantile normalization to the markers>: \nexample -> yes'
 tooltip_38 = '<optional, name of the column in cell_data.csv to perform batch correction by>: \nexample -> batch_id'
+tooltip_39 = '<optional, yes or no to apply 0 to 1 re-scale normalization>: \nexample -> yes'
      
 sg.theme('LightBrown10')
 
@@ -100,6 +101,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Cell size bottom crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='5',s=20,disabled=True, key='-ANALYSIS_BOTTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_34)],
           [sg.Text('  - Custom Cell Profiling filtering:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_CUSFIL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_35)],
           [sg.Text('  - log1p normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_LOGNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_37)],
+          [sg.Text('  - Standard normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_STDNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_39)],
           [sg.Text('  - Batch correction by column:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_BATCOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_38)],
           [sg.Text('  - Quantile normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-ANALYSIS_QUANOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_36)],
           [sg.Text('  - Perform leiden cluster', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_LEIDEN-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_29)],
@@ -197,6 +199,7 @@ while True:
         window['-ANALYSIS_BOTTHR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_CUSFIL-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_LOGNOR-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_STDNOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_QUANOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_BATCOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_LEIDEN-'].update(disabled=(not values['-ANALYSIS-']))
@@ -296,6 +299,7 @@ if values['-ANALYSIS-']:
         ' -cellsize_min=' + values['-ANALYSIS_BOTTHR-'] +  
         ' -custom_filter=' + ('yes' if values['-ANALYSIS_CUSFIL-'] else 'no') + 
         ' -log_norm=' + ('yes' if values['-ANALYSIS_LOGNOR-'] else 'no') + 
+        ' -std_norm=' + ('yes' if values['-ANALYSIS_STDNOR-'] else 'no') + 
         ' -quantile_norm=' + ('yes' if values['-ANALYSIS_QUANOR-'] else 'no') + 
         ' -batch_corr=' + values['-ANALYSIS_BATCOR-'])
     if (values['-ANALYSIS_LEIDEN-']): 
