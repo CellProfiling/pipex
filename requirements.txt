@@ -27,6 +27,7 @@ grpcio==1.44.0
 h5py==2.10.0
 idna==3.3
 igraph==0.9.9
+imagecodecs==2022.2.22
 imageio==2.16.1
 importlib-metadata==4.11.2
 inflect==5.4.0
