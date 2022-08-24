@@ -20,9 +20,12 @@ from skimage.io import imsave, imread
 from skimage.exposure import is_low_contrast, equalize_adapthist
 from skimage.measure import regionprops
 from skimage.segmentation import watershed, mark_boundaries, expand_labels
+from skimage.transform import resize
 
 
 PIL.Image.MAX_IMAGE_PIXELS = 10000000000
+pipex_max_resolution = 20000
+pipex_scale_factor = 0
 data_folder = os.environ.get('PIPEX_DATA')
 stardist_tile_threshold = 4096
 watershed_tile_threshold = 2048
@@ -38,6 +41,33 @@ membrane_keep = "no"
 adjust_images = 0
 measure_markers = ""
        
+       
+def downscale_images(np_img):    
+    if (len(np_img) > pipex_max_resolution or len(np_img[0]) > pipex_max_resolution):  
+        global pipex_scale_factor
+        if (pipex_scale_factor == 0):
+            i = 2
+            while (pipex_scale_factor == 0):
+                if (max(len(np_img), len(np_img[0])) / i <= pipex_max_resolution):
+                    pipex_scale_factor = i
+                else:
+                    i = i * 2 
+            global nuclei_diameter
+            nuclei_diameter = nuclei_diameter / pipex_scale_factor
+            global nuclei_expansion
+            nuclei_expansion = nuclei_expansion / pipex_scale_factor
+            global membrane_diameter
+            membrane_diameter = membrane_diameter / pipex_scale_factor
+        return resize(np_img, (len(np_img) / pipex_scale_factor, len(np_img[0]) / pipex_scale_factor))
+    return np_img
+
+
+def upscale_data_table(df):    
+    if (pipex_scale_factor > 0):
+        df['x'] = df['x'] * pipex_scale_factor  
+        df['y'] = df['y'] * pipex_scale_factor 
+        df['size'] = df['size'].apply(lambda x: int(pow((math.sqrt(x) * pipex_scale_factor), 2)))
+        
     
 def cell_segmentation(nuclei_img_orig, membrane_img_orig):    
     #normalizing images
@@ -86,7 +116,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     _ = None
     #for big images (>stardist_tile_threshold), run predict_instances_big method using 2048 square tiles
     if len(nuclei_img) + len(nuclei_img[0]) > stardist_tile_threshold:
-        sdLabels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=64)
+        sdLabels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128)
     else:
         sdLabels, _ = model.predict_instances(nuclei_img,axes='YX')
     print(">>> Stardist prediction done =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
@@ -218,6 +248,9 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                        if (filled_pixel > 0):
                            sdLabelsExpanded[row + bbox[0] - 1][column + bbox[1] - 1] = segment.label
 
+    else:
+        del sdLabels
+        
     np.save(data_folder + '/analysis/segmentation_data.npy', sdLabelsExpanded)
     print(">>> Final joined segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
     
@@ -316,16 +349,16 @@ if __name__ =='__main__':
             with TiffFile(file_path) as tif:
                 if len(tif.series[0].pages) == 1:
                     if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                        nuclei_img = next(iter(tif.series[0].pages)).asarray()
+                        nuclei_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
                     if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                        membrane_img = next(iter(tif.series[0].pages)).asarray()
+                        membrane_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
                 else:
                     for page in tif.series[0].pages:
                         biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
                         if biomarker == nuclei_marker:
-                            nuclei_img = page.asarray()
+                            nuclei_img = downscale_images(page.asarray())
                         if biomarker == membrane_marker:
-                            membrane_img = page.asarray()
+                            membrane_img = downscale_images(page.asarray())
         except:
             print('>>> checking type of ' + file_path + ', not TIFF', flush=True)  
             next_try = True
@@ -334,18 +367,18 @@ if __name__ =='__main__':
             next_try = False
             try:
                 if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                    nuclei_img = imread(file_path)
+                    nuclei_img = downscale_images(imread(file_path))
                 if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                    membrane_img = imread(file_path)
+                    membrane_img = downscale_images(imread(file_path))
             except:
                 next_try = True
 
         if next_try:
             try:
                 if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                    nuclei_img = np.array(PIL.Image.open(file_path))
+                    nuclei_img = downscale_images(np.array(PIL.Image.open(file_path)))
                 if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                    membrane_img = np.array(PIL.Image.open(file_path))
+                    membrane_img = downscale_images(np.array(PIL.Image.open(file_path)))
             except:
                 print('>>> Could not read image ' + file_path, flush=True)  
         
@@ -380,7 +413,7 @@ if __name__ =='__main__':
                     else:
                         for marker in measure_markers:
                             if marker in file:
-                                marker_calculation(marker, next(iter(tif.series[0].pages)).asarray(), cellLabels, data_table)
+                                marker_calculation(marker, downscale_images(next(iter(tif.series[0].pages)).asarray()), cellLabels, data_table)
                                 break
                 else:
                     for page in tif.series[0].pages:
@@ -390,7 +423,7 @@ if __name__ =='__main__':
                         elif biomarker == membrane_marker:
                             marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
                         elif biomarker in measure_markers:
-                            marker_calculation(biomarker, page.asarray(), cellLabels, data_table)
+                            marker_calculation(biomarker, downscale_images(page.asarray()), cellLabels, data_table)
         except:
             print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)  
             next_try = True
@@ -405,7 +438,7 @@ if __name__ =='__main__':
                 else:
                     for marker in measure_markers:
                         if marker in file:
-                            marker_calculation(marker, imread(file), cellLabels, data_table)
+                            marker_calculation(marker, downscale_images(imread(file)), cellLabels, data_table)
                             break
             except:
                 next_try = True
@@ -419,7 +452,7 @@ if __name__ =='__main__':
                 else:
                     for marker in measure_markers:
                         if marker in file:
-                            marker_calculation(marker, np.array(PIL.Image.open(file_path)), cellLabels, data_table)
+                            marker_calculation(marker, downscale_images(np.array(PIL.Image.open(file_path))), cellLabels, data_table)
                             break
             except:
                 print('>>> Could not read image ' + file_path, flush=True) 
@@ -427,6 +460,7 @@ if __name__ =='__main__':
 
     #dumpming data_table in cell_data.csv file
     df = pd.DataFrame.from_dict(data_table, orient='index')
+    upscale_data_table(df)
     df.to_csv(data_folder + '/analysis/cell_data.csv', index=False) 
         
     print(">>> End time segmentation =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
