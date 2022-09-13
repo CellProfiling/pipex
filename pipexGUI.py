@@ -45,8 +45,7 @@ tooltip_19 = '<percentage of the image base intensity to apply>: \nexample -> 15
 tooltip_20 = '<number of pixels of a tile>: \nexample -> 1844' 
 tooltip_21 = '<number of pixels to use as smooth region for the tile cut>: \nexample -> 20' 
 tooltip_22 = '<yes or no to generate heat maps per image>: \nexample -> yes'  
-tooltip_23 = '<yes or no to balance the tiles of the image>: \nexample -> yes'  
-tooltip_24 = '<number, main levels of intensity in the image [normally 3 or 4]>: \nexample -> 3'  
+tooltip_24 = '<number, main levels of intensity in the image [normally 3-5] and their 2 selected focus>: \nexample -> 4:1:3'  
 tooltip_25 = '<number, factor of complexity of light issues [1 to 4 should be enough]>: \nexample -> 3'  
 tooltip_26 = '<yes or no to reduce artifacts or foldings to a main intensity level>: \nexample -> yes'
 tooltip_27 = '<optional, list of present specific markers to analyze>: \nexample -> AMY2A,SST,GORASP2'
@@ -71,12 +70,11 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Checkbox('Preprocessing', font='any 12 bold', key='-PREPROCESS-', enable_events=True)],
           [sg.Text('  - Min. threshold:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20, disabled=True, key='-PREPROCESS_THRMIN-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_17)],
           [sg.Text('  - Max. threshold:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='100',s=20, disabled=True, key='-PREPROCESS_THRMAX-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_18)],
-          [sg.Text('  - Fix tiling', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILFIX-', disabled=True, enable_events=True)],
+          [sg.Text('  - Balance tiles', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILFIX-', disabled=True, enable_events=True)],
           [sg.Text('  - Tile size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='1844',s=20,disabled=True, key='-PREPROCESS_TILSIZ-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_20)],
           [sg.Text('  - Bright levels:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='3',s=20,disabled=True, key='-PREPROCESS_TILOTS-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_24)],
           [sg.Text('  - Flatten spots', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILFLA-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_26)],
           [sg.Text('  - Light gradient:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='3',s=20,disabled=True, key='-PREPROCESS_TILKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_25)],
-          [sg.Text('  - Balance tiles', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILBAL-',default=True, disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_23)],
           [sg.Text('  - Stitch size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='40',s=20,disabled=True, key='-PREPROCESS_TILSTI-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_21)],
           [sg.Text('  - Exposure:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='100',s=20, disabled=True, key='-PREPROCESS_EXPOSU-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_19)],
           [sg.Text('  - Generate heat maps', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_HEAMAP-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_22)],
@@ -154,7 +152,6 @@ while True:
         window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILKER-'].update(disabled=(not values['-PREPROCESS-']))
-        window['-PREPROCESS_TILBAL-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILSTI-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_HEAMAP-'].update(disabled=(not values['-PREPROCESS-']))
         if (values['-PREPROCESS-']):
@@ -162,14 +159,12 @@ while True:
             window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
             window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
             window['-PREPROCESS_TILKER-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
-            window['-PREPROCESS_TILBAL-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
             window['-PREPROCESS_TILSTI-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
     if event == '-PREPROCESS_TILFIX-':
         window['-PREPROCESS_TILSIZ-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
         window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
         window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
         window['-PREPROCESS_TILKER-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
-        window['-PREPROCESS_TILBAL-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
         window['-PREPROCESS_TILSTI-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
     if event == '-SEGMENTATION-':
         window['-SEGMENTATION_NUCMARK-'].update(disabled=(not values['-SEGMENTATION-']))
@@ -271,7 +266,7 @@ if values['-PREPROCESS-']:
             ' -bright_levels=' + values['-PREPROCESS_TILOTS-'] +
             ' -flatten_spots=' + ('yes' if values['-PREPROCESS_TILFLA-'] else 'no') +
             ' -light_gradient=' + values['-PREPROCESS_TILKER-'] +
-            ' -balance_tiles=' + ('yes' if values['-PREPROCESS_TILBAL-'] else 'no') +
+            ' -balance_tiles=yes' +
             ' -stitch_size=' + values['-PREPROCESS_TILSTI-'])
             
 if values['-SEGMENTATION-']:
@@ -342,5 +337,4 @@ if (batch_list != ''):
         os.system("sudo docker-compose up pipex") 
     else:
         pipex.batch_processor() 
-
 
