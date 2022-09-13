@@ -25,7 +25,7 @@ thres_min = 0.0
 thres_max = 1.0
 
 tile_size = 0
-bright_levels = 3
+bright_levels = 0
 light_gradient = 0
 flatten_spots = 'no'
 balance_tiles = 'no'
@@ -33,18 +33,19 @@ stitch_size = 0
 
 exposure = 1.0
 heat_map='no'
+
+bin_min = 1
+bin_max = 2
        
        
 def rescale_tile_intensity(x, mean_in, mean_factor, dev_in, dev_factor, bins):
-    result = x
-    if (x >= bins[1]):
-        result = min(max(0, x + (mean_in * mean_factor) - mean_in), 1.0)
-        result_dev = ((x - mean_in) * dev_factor) - (x - mean_in)
-        result = min(max(0, result + result_dev if x >= mean_in else - result_dev), 1.0) 
-    elif (x > 0):
-        result = min(max(0, x + (mean_in * mean_factor) - mean_in) * (x / bins[1]), 1.0)
-        result_dev = ((x - mean_in) * (x / bins[1]) * dev_factor) - (x - mean_in) * (x / bins[1])
-        result = min(max(0, result + result_dev if x >= mean_in else - result_dev), 1.0) 
+    result = min(max(0, x + (mean_in * mean_factor) - mean_in), 1.0)
+    result_dev = ((x - mean_in) * dev_factor) - (x - mean_in)
+    result = min(max(0, result + result_dev if x >= mean_in else - result_dev), 1.0) 
+    if (result > bins[bin_max]):
+        result = bins[bin_max] + math.pow((result - bins[bin_max]) * 100, 0.6) / 100
+    elif (result < bins[bin_min]):
+        result = bins[bin_min] - math.pow((bins[bin_min] - result) * 100, 0.6) / 100
 
     return result
     
@@ -53,23 +54,22 @@ def apply_tile_compensation(f_name, np_img, bins, tile_data, local_tile_size, lo
     num_rows = int(len(np_img) / local_tile_size)
     num_columns = int(len(np_img[0]) / local_tile_size)
             
-    if (balance_tiles == 'yes'): 
-        for row in range(num_rows):
-            for column in range(num_columns):
-                if (tile_data['tiles'][row][column]['samples'] > 0):         
-                    tile = np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)]
-    
-                    mean_factor = tile_data['chosen']['mean'] / tile_data['tiles'][row][column]['mean']
-                    dev_factor = tile_data['chosen']['deviation'] / max(0.001, tile_data['tiles'][row][column]['deviation']) 
+    for row in range(num_rows):
+        for column in range(num_columns):
+            if (tile_data['tiles'][row][column]['samples'] > 0):         
+                tile = np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)]
+   
+                mean_factor = tile_data['chosen']['mean'] / tile_data['tiles'][row][column]['mean']
+                dev_factor = tile_data['chosen']['deviation'] / max(0.001, tile_data['tiles'][row][column]['deviation']) 
            
-                    values = tile[np.nonzero(tile)]
-                    curr_mean = np.mean(values)
-                    curr_dev = np.std(values)
+                values = tile[np.nonzero(tile)]
+                curr_mean = np.mean(values)
+                curr_dev = np.std(values)
             
-                    np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)] = np.reshape(np.array([rescale_tile_intensity(x, curr_mean, mean_factor, curr_dev, dev_factor, bins) for x in np.ravel(tile)]), (local_tile_size, local_tile_size)) 
+                np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)] = np.reshape(np.array([rescale_tile_intensity(x, curr_mean, mean_factor, curr_dev, dev_factor, bins) for x in np.ravel(tile)]), (local_tile_size, local_tile_size)) 
                     
-        if (tile_size == local_tile_size):                
-            print(">>> Balanced tiles for image",f_name,"=",datetime.datetime.now().strftime("%H:%M:%S"),flush=True)
+    if (tile_size == local_tile_size):                
+        print(">>> Balanced tiles for image",f_name,"=",datetime.datetime.now().strftime("%H:%M:%S"),flush=True)
             
     if (local_stitch_size > 0):
         for row in range(num_rows):
@@ -120,13 +120,13 @@ def generate_tile_compensation_data(np_img, bins, local_tile_size):
             bin_count = np.histogram(np.ravel(tile), bins)[0]
             
             values = tile[np.nonzero(tile)]
-            values = values[values >= bins[1]]
-            values = values[values <= bins[3]]
+            values = values[values >= bins[bin_min]]
+            values = values[values <= bins[bin_max]]
 	   
             curr_subtile_data = {}
             curr_subtile_data['row'] = tile_row 
             curr_subtile_data['column'] = tile_column 
-            curr_subtile_data['samples'] = bin_count[2]
+            curr_subtile_data['samples'] = bin_count[bin_max]
             if (curr_subtile_data['samples'] == 0):
                 curr_subtile_data['mean'] = 0
                 curr_subtile_data['deviation'] = 0
@@ -163,12 +163,10 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
     for row in range(num_rows):
         for column in range(num_columns):
             tile_ratio = gradient_data[row][column]['ratio_gradient']
-            #print("tile",row,column,"ratio",tile_ratio,flush=True)
             if (tile_ratio > 0): 
                 for row_kernel in range(light_gradient):
                     for column_kernel in range(light_gradient):
                         kernel_ratio = gradient_data[row][column]['kernels'][row_kernel][column_kernel]['ratio_gradient']
-                        #print("kernel",row_kernel,column_kernel,"ratio",kernel_ratio,flush=True)
                         if (kernel_ratio > 0 and kernel_ratio < tile_ratio):                
                             tile_kernel_sy = row * tile_size + row_kernel * kernel_size
                             tile_kernel_sx = column * tile_size + column_kernel * kernel_size
@@ -176,7 +174,7 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
                             tile_kernel_ex = kernel_size + (tile_size % light_gradient) if column_kernel == light_gradient - 1 else 0
                             tile_kernel = np_img[tile_kernel_sy:(tile_kernel_sy + tile_kernel_ey), tile_kernel_sx:(tile_kernel_sx + tile_kernel_ex)]
                         
-                            final_ratio = 1 + (bins[2] * (tile_ratio / kernel_ratio)) / bins[2]
+                            final_ratio = 1 + (bins[bin_max] * (tile_ratio / kernel_ratio)) / bins[bin_max]
                         
                             for i1 in range(kernel_size):
                                 for i2 in range(kernel_size):
@@ -184,7 +182,7 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
                 
                 tile = np_img[(row * tile_size):((row + 1) * tile_size), (column * tile_size):((column + 1) * tile_size)]
                 subtile_data = generate_tile_compensation_data(tile, bins, kernel_size)   
-                apply_tile_compensation('', tile, bins, subtile_data, kernel_size, 0)
+                apply_tile_compensation('', tile, bins, subtile_data, kernel_size, kernel_size / 10)
 
     imsave(data_folder + "/preprocessed/" + os.path.splitext(file)[0] + "_gradient.jpg", np.uint8(np_img * 255))
     
@@ -220,15 +218,9 @@ def generate_tile_gradient_data(np_img, bins, tile_size):
                     tile_kernel = np_img[tile_kernel_sy:(tile_kernel_sy + tile_kernel_ey), tile_kernel_sx:(tile_kernel_sx + tile_kernel_ex)]
                     bin_count = np.histogram(np.ravel(tile_kernel), bins)[0]
                     samples = 0
-                    #for ind in range(1, len(bin_count)):
-                    #    samples = samples + bin_count[ind]
-                    samples = bin_count[1] + bin_count[2]
-                    #top_samples = bin_count[len(bin_count) - 1]
-                    top_samples = bin_count[2]
-                    middle_samples = 0
-                    #for ind in range(1, len(bin_count) - 1):
-                    #    middle_samples = middle_samples + bin_count[ind]
-                    middle_samples = bin_count[1]
+                    samples = bin_count[bin_min] + bin_count[bin_max]
+                    top_samples = bin_count[bin_max]
+                    middle_samples = bin_count[bin_min]
                     tile_gradient_info = {}
                     tile_gradient_info['bins'] = bin_count  
                     if (top_samples > 0): 
@@ -288,7 +280,15 @@ def options(argv):
                 tile_size = int(arg[11:])
             elif arg.startswith('-bright_levels='):
                 global bright_levels
-                bright_levels = int(arg[15:])
+                global bin_min
+                global bin_max
+                par_bl = arg[15:]
+                if (":" in par_bl):
+                    bright_levels = int(par_bl.split(":")[0])
+                    bin_min = int(par_bl.split(":")[1])
+                    bin_max = int(par_bl.split(":")[2])
+                else: 
+                    bright_levels = int(par_bl)
             elif arg.startswith('-flatten_spots='):
                 global flatten_spots
                 flatten_spots = arg[15:]
@@ -317,34 +317,106 @@ def preprocess_image(f_name, numpy_img):
         
     apply_thresholds(f_name, np_img, thres_min, thres_max)
                 
-    c_otsu = threshold_multiotsu(np_img, bright_levels)
-    bins = np.insert(c_otsu, 0, 0.0)
-    bins = np.append(bins, 1.0)
-    regions = np.digitize(np_img, bins=bins)
-    regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
-    imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu.jpg", np.uint8(regions * 255))
+    if (balance_tiles == "yes"):
+        global bright_levels
+        if (flatten_spots == 'yes'): 
+            c_otsu = threshold_multiotsu(np_img, 3 if bright_levels == 0 else bright_levels)
+            bins = np.insert(c_otsu, 0, 0.0)
+            bins = np.append(bins, 1.0)
+            spot_threshold = bins[bin_max]
+            np_img = np.reshape(np.array([x if x <= spot_threshold else spot_threshold + math.pow((x - spot_threshold) * 100, 0.6) / 100 for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_flattened.jpg", np.uint8(np_img * 255))
+                
+        if bright_levels == 0:
+            c_otsu = threshold_multiotsu(np_img, 3)
+            bins = np.insert(c_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_3.jpg", np.uint8(regions * 255))
         
-    if (tile_size > 0):
-        #if not 'chosen' in tile_data:
-        if (light_gradient > 0):
+            c_otsu = threshold_multiotsu(np_img, 4)
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [2])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_1-2.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [1])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_1-3.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [0])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_2-3.jpg", np.uint8(regions * 255))
+        
+            c_otsu = threshold_multiotsu(np_img, 5)
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [2,3])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-2.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [1,3])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-3.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [1,2])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-4.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [0,3])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_2-3.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [0,2])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_2-4.jpg", np.uint8(regions * 255))
+        
+            temp_otsu = c_otsu.copy()
+            temp_otsu = np.delete(temp_otsu, [0,1])
+            bins = np.insert(temp_otsu, 0, 0.0)
+            regions = np.digitize(np_img, bins=bins)
+            regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_3-4.jpg", np.uint8(regions * 255))
+          
+            bright_levels = 3
+                  
+        c_otsu = threshold_multiotsu(np_img, bright_levels)
+        bins = np.insert(c_otsu, 0, 0.0)
+        bins = np.append(bins, 1.0)
+        regions = np.digitize(np_img, bins=bins)
+        regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0]))) 
+        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu.jpg", np.uint8(regions * 255))
+        
+        if (light_gradient > 1):
             gradient_data = generate_tile_gradient_data(np_img, bins, tile_size)
 
-        if (balance_tiles == 'yes'): 
-            tile_data = generate_tile_compensation_data(np_img, bins, tile_size)
+        tile_data = generate_tile_compensation_data(np_img, bins, tile_size)
 
-        if (light_gradient > 0):
+        if (light_gradient > 1):
             apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data)
                 
-        if (balance_tiles == 'yes' or stitch_size > 0): 
-            apply_tile_compensation(f_name, np_img, bins, tile_data, tile_size, stitch_size)
-                
-        apply_thresholds('', np_img, bins[1] * 0.1, 100)
-            
-    if (flatten_spots == 'yes'): 
-        spot_threshold = bins[len(bins) - 2]
-        if (spot_threshold < 0.9):
-            flattened_factor = (spot_threshold * 0.1) / (1 - spot_threshold)
-            np_img = np.reshape(np.array([x if x <= spot_threshold else spot_threshold + (x - spot_threshold) * flattened_factor for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
+        apply_tile_compensation(f_name, np_img, bins, tile_data, tile_size, stitch_size)
         
     if (exposure != 1):
         np_img = np.reshape(np.array([max(0, min(1, x * exposure)) for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
@@ -352,7 +424,7 @@ def preprocess_image(f_name, numpy_img):
     print(">>> Preprocessed result image",f_name,"saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
             
     if (heat_map == 'yes'):    
-        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + '_heatmap.jpg', cv2.applyColorMap(np.uint8(np.reshape(np.array([1 - x for x in np.ravel(np_img)]), (len(np_img), len(np_img[0]))) * 255), cv2.COLORMAP_JET))
+        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + '_heatmap.jpg', cv2.applyColorMap(np.uint8(np.reshape(np.array([1 - x for x in np.ravel(np_img)]), (len(np_img), len(np_img[0]))) * 255), cv2.COLORMAP_PARULA))
         print(">>> Preprocessed heatmap for image ",f_name,"saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
                        
 
@@ -382,8 +454,6 @@ if __name__ =='__main__':
         next_try = False
         try:
             with TiffFile(file_path) as tif:
-                print(len(tif.series))
-                print(tif.series)
                 if len(tif.series[0].pages) == 1:
                     preprocess_image(file, next(iter(tif.series[0].pages)).asarray())
                 else:
