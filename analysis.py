@@ -206,10 +206,11 @@ def data_calculations():
 
 #Function to convert regular RGB to packed integer
 def generate_leiden_color(leiden_id, leiden_color_list):
-    if str(leiden_id) == '':
-       return ''
-    rgb = PIL.ImageColor.getcolor(leiden_color_list[int(leiden_id)], "RGB")
-    return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
+    try:
+        rgb = PIL.ImageColor.getcolor(leiden_color_list[int(leiden_id)], "RGB")
+        return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
+    except Exception as e:
+        return ''
 
 
 #Function to perform different cluster methods
@@ -276,25 +277,37 @@ def clustering(df_norm, markers):
         plt.clf()
         plt.close()
         
-        sq.gr.spatial_neighbors(adata, coord_type="generic")
-        sq.gr.nhood_enrichment(adata, cluster_key="leiden")
-        plt.figure()
-        sq.pl.nhood_enrichment(adata, cluster_key="leiden", method="ward", show=False, save='nhood_enrichment_leiden.jpg')
-        plt.clf()
-        plt.close()
+        try: 		
+            sq.gr.spatial_neighbors(adata, coord_type="generic")
+            sq.gr.nhood_enrichment(adata, cluster_key="leiden")
+            plt.figure()
+            sq.pl.nhood_enrichment(adata, cluster_key="leiden", method="single", show=False, save='nhood_enrichment_leiden.jpg')
+            plt.clf()
+            plt.close()
+        except Exception as e:
+            print(e)
+            print('>>> Neighborhood analysis failed', flush=True) 
 
-        sq.gr.interaction_matrix(adata, cluster_key="leiden")
-        plt.figure()
-        sq.pl.interaction_matrix(adata, cluster_key="leiden", show=False, save='interaction_matrix_leiden.jpg')
-        plt.clf()
-        plt.close()
-
-        sc.tl.rank_genes_groups(adata, 'leiden', method='t-test')
-        sc.settings.set_figure_params(format='jpg',figsize=(image_size / 200, image_size / 200))
-        plt.figure()
-        sc.pl.rank_genes_groups(adata, n_genes=len(markers), sharey=False, show=False, save='')
-        plt.clf()
-        plt.close()
+        try: 		
+            sq.gr.interaction_matrix(adata, cluster_key="leiden")
+            plt.figure()
+            sq.pl.interaction_matrix(adata, cluster_key="leiden", show=False, save='interaction_matrix_leiden.jpg')
+            plt.clf()
+            plt.close()
+        except Exception as e:
+            print(e)
+            print('>>> Interaction matrix analysis failed', flush=True) 
+            
+        try: 		
+            sc.tl.rank_genes_groups(adata, 'leiden', method='t-test')
+            sc.settings.set_figure_params(format='jpg',figsize=(image_size / 200, image_size / 200))
+            plt.figure()
+            sc.pl.rank_genes_groups(adata, n_genes=len(markers), sharey=False, show=False, save='')
+            plt.clf()
+            plt.close()
+        except Exception as e:
+            print(e)
+            print('>>> Rank genes groups analysis failed', flush=True)
    
         sc.settings.set_figure_params(format='jpg',figsize=(image_size / 100, image_size / 100))
         plt.figure()
@@ -361,25 +374,37 @@ def clustering(df_norm, markers):
         plt.clf()
         plt.close()
 
-        sq.gr.spatial_neighbors(adata, coord_type="generic")
-        sq.gr.nhood_enrichment(adata, cluster_key="kmeans")
-        plt.figure()
-        sq.pl.nhood_enrichment(adata, cluster_key="kmeans", method="ward", show=False, save='nhood_enrichment_kmeans.jpg')
-        plt.clf()
-        plt.close()
+        try: 		
+            sq.gr.spatial_neighbors(adata, coord_type="generic")
+            sq.gr.nhood_enrichment(adata, cluster_key="kmeans")
+            plt.figure()
+            sq.pl.nhood_enrichment(adata, cluster_key="kmeans", method="single", show=False, save='nhood_enrichment_kmeans.jpg')
+            plt.clf()
+            plt.close()
+        except Exception as e:
+            print(e)
+            print('>>> Neighborhood analysis failed', flush=True) 
+            
+        try: 		
+            sq.gr.interaction_matrix(adata, cluster_key="kmeans")
+            plt.figure()
+            sq.pl.interaction_matrix(adata, cluster_key="kmeans", show=False, save='interaction_matrix_kmeans.jpg')
+            plt.clf()
+            plt.close()
+        except Exception as e:
+            print(e)
+            print('>>> Interaction matrix analysis failed', flush=True) 
 
-        sq.gr.interaction_matrix(adata, cluster_key="kmeans")
-        plt.figure()
-        sq.pl.interaction_matrix(adata, cluster_key="kmeans", show=False, save='interaction_matrix_kmeans.jpg')
-        plt.clf()
-        plt.close()
-
-        sc.tl.rank_genes_groups(adata, 'kmeans', method='t-test')
-        sc.settings.set_figure_params(format='jpg',figsize=(image_size / 200, image_size / 200))
-        plt.figure()
-        sc.pl.rank_genes_groups(adata, n_genes=len(markers), sharey=False, show=False, save='')
-        plt.clf()
-        plt.close()
+        try: 		
+            sc.tl.rank_genes_groups(adata, 'kmeans', method='t-test')
+            sc.settings.set_figure_params(format='jpg',figsize=(image_size / 200, image_size / 200))
+            plt.figure()
+            sc.pl.rank_genes_groups(adata, n_genes=len(markers), sharey=False, show=False, save='')
+            plt.clf()
+            plt.close()
+        except Exception as e:
+            print(e)
+            print('>>> Rank genes groups analysis failed', flush=True)  
     
         sc.settings.set_figure_params(format='jpg',figsize=(image_size / 100, image_size / 100))
         plt.figure()
