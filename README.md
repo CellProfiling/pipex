@@ -137,10 +137,10 @@ There are currently available the following commands:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
   - `-threshold_min=<number, percentage of intensity>` : example -> -threshold_min=1. **OBS**: this is minimum percentage of the global intensity (the image limit) from which all intensities below will be deleted.
   - `-threshold_max=<number, percentage of intensity>` : example -> -threshold_min=99. **OBS**: this is maximum percentage of the global intensity (the image limit) from which all intensities above will be deleted.
-  - `-tile_size=<number of pixels>` : example -> -tile_size=1844. **OBS**: this is the size of the image square tiles
-  - `-bright_levels=<number, main levels of intensity in the image [normally 3 or 4]>` : example -> -bright_levels=3. **OBS**: this is the number of otsu thresholds to use while processing the image.
-  - `-light_gradient=<number, factor of complexity of light issues [1 to 4 should be enough]>` : example -> -light_gradient=3. **OBS**: this is the exponential value of squared sub-tiles that will be used to try to reduce the light gradients in each tile.
   - `-balance_tiles=<yes or no>` : example -> -balance_tiles=yes. **OBS**: this activates the option to try to homogenize the intensities of all the tiles
+  - `-tile_size=<number of pixels>` : example -> -tile_size=1844. **OBS**: this is the size of the image square tiles
+  - `-bright_levels=<number, main levels of intensity in the image [normally 3-5 and their 2 selected focus]>` : example -> -bright_levels=4:1:3. **OBS**: this is the number of otsu thresholds to use while processing the image and the two ones selected as main intervals. If you use 0 it will default to 3:1:2 but provide a sample of many otsu intervals as output files.
+  - `-light_gradient=<number, factor of complexity of light issues [1 to 4 should be enough]>` : example -> -light_gradient=3. **OBS**: this is the exponential value of squared sub-tiles that will be used to try to reduce the light gradients in each tile.
   - `-stitch_size=<number of pixels>` : example -> -stitch_size=20. **OBS**: this specifies the width of the region to use while performing the smooth operation in the tile cuts
   - `-exposure=<number, percentage of the base intensity>` : example -> -exposure=150. **OBS**: this increases the exposure of the image once it has been preprocessed
   - `-heat_map=<yes or no>` : example -> -heat_map=yes. **OBS**: this generates a heat_map of the preprocessed image
@@ -352,8 +352,10 @@ Through a combination of these techniques (which can be easily tried and re-trie
 ![Image example 3](./doc/doc24.jpg "Image example 3")
 ![PIPEX preprocessing 3](./doc/doc25.jpg "PIPEX preprocessing 3")
 
-*Very damaged image: background signal, shifting gradient lights, very unbalanced tiles, precipitates, etc... Preprocessed with -threshold_min=7 -threshold_max=100 -exposure=100 -heat_map=no -tile_size=1844 -bright_levels=4 -flatten_spots=yes -light_gradient=3 -balance_tiles=yes -stitch_size=40*
+*Very damaged image: background signal, shifting gradient lights, very unbalanced tiles, precipitates, etc... Preprocessed with -threshold_min=7 -threshold_max=100 -exposure=100 -heat_map=no -tile_size=1844 -bright_levels=4:1:3 -flatten_spots=yes -light_gradient=3 -balance_tiles=yes -stitch_size=40*
 <div style="page-break-after: always;"></div>
+
+There's a full [presentation](https://github.com/CellProfiling/pipex/blob/main/doc/preprocessing_presentation.zip) about PIPEX's preprocessing technique available. Just download it and open `preprocessing_presentation.html` in your browser.
 
 
 Annex 3: Custom Cell Profiling lab analysis filtration
@@ -366,4 +368,3 @@ PIPEX's analysis step includes an optional marker filtration commonly used in Ce
  - `CTNNB1` 1% top ranked intensities cell removal
 
 Please make sure you the name of your marker column is a stric match with the aforementioned ones
-
