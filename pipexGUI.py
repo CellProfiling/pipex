@@ -45,6 +45,7 @@ tooltip_19 = '<percentage of the image base intensity to apply>: \nexample -> 15
 tooltip_20 = '<number of pixels of a tile>: \nexample -> 1844' 
 tooltip_21 = '<number of pixels to use as smooth region for the tile cut>: \nexample -> 20' 
 tooltip_22 = '<yes or no to generate heat maps per image>: \nexample -> yes'  
+tooltip_23 = '<optional, "strictness" of stardist detections, gradation between 0.001 and 0.999>: \nexample -> 0.5'
 tooltip_24 = '<number, main levels of intensity in the image [normally 3-5] and their 2 selected focus>: \nexample -> 4:1:3'  
 tooltip_25 = '<number, factor of complexity of light issues [1 to 4 should be enough]>: \nexample -> 3'  
 tooltip_26 = '<yes or no to reduce artifacts or foldings to a main intensity level>: \nexample -> yes'
@@ -83,6 +84,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - NUCLEI marker:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='DAPI1',s=20,disabled=True, key='-SEGMENTATION_NUCMARK-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_1)],
           [sg.Text('  - NUCLEI diameter:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='20',s=20,disabled=True, key='-SEGMENTATION_NUCDIAM-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_2)],
           [sg.Text('  - NUCLEI expansion:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='20',s=20,disabled=True, key='-SEGMENTATION_NUCEXPA-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_3)],
+          [sg.Text('  - NUCLEI definition:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-SEGMENTATION_NUCDEFI-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_23)],
           [sg.Text('  - Use membrane marker', pad=((20,0), (0,0))), sg.Checkbox('',key='-SEGMENTATION_MEMUSE-', disabled=True, enable_events=True)],
           [sg.Text('  - MEMBRANE marker:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='HSP90B1',s=20,disabled=True, key='-SEGMENTATION_MEMMARK-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_4)],
           [sg.Text('  - MEMBRANE diameter:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='25',s=20,disabled=True, key='-SEGMENTATION_MEMDIAM-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_5)],
@@ -170,6 +172,7 @@ while True:
         window['-SEGMENTATION_NUCMARK-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_NUCDIAM-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_NUCEXPA-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_NUCDEFI-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMUSE-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMMARK-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION-']))
@@ -275,6 +278,7 @@ if values['-SEGMENTATION-']:
         ' -nuclei_marker=' + values['-SEGMENTATION_NUCMARK-'] +
         ' -nuclei_diameter=' + values['-SEGMENTATION_NUCDIAM-'] +
         ' -nuclei_expansion=' + values['-SEGMENTATION_NUCEXPA-'] +
+        ' -nuclei_definition=' + values['-SEGMENTATION_NUCDEFI-'] +
         ' -adjust_images=' + ('yes' if values['-SEGMENTATION_ADJUST-'] else 'no'))
     if (values['-SEGMENTATION_MEMUSE-']):       
         batch_list = (batch_list +  
