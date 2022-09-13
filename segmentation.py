@@ -412,7 +412,7 @@ if __name__ =='__main__':
                         marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
                     else:
                         for marker in measure_markers:
-                            if marker in file:
+                            if marker + '.' in file:
                                 marker_calculation(marker, downscale_images(next(iter(tif.series[0].pages)).asarray()), cellLabels, data_table)
                                 break
                 else:
@@ -437,7 +437,7 @@ if __name__ =='__main__':
                     marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
                 else:
                     for marker in measure_markers:
-                        if marker in file:
+                        if marker + '.' in file:
                             marker_calculation(marker, downscale_images(imread(file)), cellLabels, data_table)
                             break
             except:
@@ -451,7 +451,7 @@ if __name__ =='__main__':
                     marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
                 else:
                     for marker in measure_markers:
-                        if marker in file:
+                        if marker + '.' in file:
                             marker_calculation(marker, downscale_images(np.array(PIL.Image.open(file_path))), cellLabels, data_table)
                             break
             except:
@@ -461,6 +461,11 @@ if __name__ =='__main__':
     #dumpming data_table in cell_data.csv file
     df = pd.DataFrame.from_dict(data_table, orient='index')
     upscale_data_table(df)
+    measure_markers.insert(0, 'y')
+    measure_markers.insert(0, 'x')
+    measure_markers.insert(0, 'size')
+    measure_markers.insert(0, 'cell_id')
+    df = df.reindex(measure_markers, axis=1)
     df.to_csv(data_folder + '/analysis/cell_data.csv', index=False) 
         
     print(">>> End time segmentation =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
