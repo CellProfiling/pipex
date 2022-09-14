@@ -63,8 +63,19 @@ def downscale_images(np_img):
     return np_img
 
 
-def upscale_data_table(df):    
+def upscale_results(df):    
     if (pipex_scale_factor > 0):
+        image = PIL.Image.open(data_folder + "/analysis/segmentation_mask.tiff")
+        image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
+        image.save(data_folder + "/analysis/segmentation_mask.tiff")        
+        
+        image = PIL.Image.open(data_folder + "/analysis/segmentation_mask_show.jpg")
+        image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
+        image.save(data_folder + "/analysis/segmentation_mask_show.jpg")
+        
+        labels = np.load(data_folder + '/analysis/segmentation_data.npy')
+        labels = labels.repeat(pipex_scale_factor, axis=0).repeat(pipex_scale_factor, axis=1) 
+        
         df['x'] = df['x'] * pipex_scale_factor  
         df['y'] = df['y'] * pipex_scale_factor 
         df['size'] = df['size'].apply(lambda x: int(pow((math.sqrt(x) * pipex_scale_factor), 2)))
@@ -464,7 +475,7 @@ if __name__ =='__main__':
 
     #dumpming data_table in cell_data.csv file
     df = pd.DataFrame.from_dict(data_table, orient='index')
-    upscale_data_table(df)
+    upscale_results(df)
     measure_markers.insert(0, 'y')
     measure_markers.insert(0, 'x')
     measure_markers.insert(0, 'size')
