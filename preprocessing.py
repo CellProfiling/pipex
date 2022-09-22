@@ -247,9 +247,19 @@ def generate_tile_gradient_data(np_img, bins, tile_size):
     return gradient_data
 
 
-def apply_thresholds(f_name, np_img, threshold_min, threshold_max): 
-    if (threshold_min > 0 or threshold_max < 100):
-        np_img[np_img < threshold_min] = 0
+def apply_thresholds(f_name, np_img, threshold_min, threshold_max):     
+    if (threshold_min > 0):
+        np_thres = np_img.copy()
+        np_thres[np_thres >= threshold_min] = 0 
+        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_threshold_bottom.tif", np.uint16(np_thres * 65535))
+        del np_thres
+        np_img[np_img < threshold_min] = 0        
+        
+    if (threshold_max < 100):
+        np_thres = np_img.copy()
+        np_thres[np_img <= threshold_max] = 0 
+        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_threshold_top.tif", np.uint16(np_thres * 65535))
+        del np_thres
         np_img[np_img > threshold_max] = 0
         
     if (f_name != ''):                
