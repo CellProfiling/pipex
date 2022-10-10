@@ -63,10 +63,12 @@ def data_calculations():
     #We filter biggest and smallest cells
     filter_set = set()
     cellsize_df = df_norm['size']
-    size_quantiles = cellsize_df.quantile([cellsize_min, 1 - cellsize_max])
     
-    filter_set.update(df_norm[df_norm['size'] > size_quantiles[1 - cellsize_max]].index.values.tolist())
-    filter_set.update(df_norm[df_norm['size'] < size_quantiles[cellsize_min]].index.values.tolist())
+    if cellsize_min > 0 or cellsize_max > 0:
+        size_quantiles = cellsize_df.quantile([0.0000000001 + cellsize_min, 0.9999999999 - cellsize_max])
+    
+        filter_set.update(df_norm[df_norm['size'] > size_quantiles[0.9999999999 - cellsize_max]].index.values.tolist())
+        filter_set.update(df_norm[df_norm['size'] < size_quantiles[0.0000000001 + cellsize_min]].index.values.tolist())
     
     if custom_filter == 'yes':
         if 'DAPI' in markers:
@@ -316,48 +318,49 @@ def clustering(df_norm, markers):
         plt.close()
     
     if (kmeans == 'yes'):
-        if (elbow == 'yes' and len(df_norm.index) <= max_samples):
-            #We calculate all kmeans clusters with k 1 to 20 so we can show the elbow method plots
-            print(">>> Performing kmeans elbow method =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True) 
-            distortions = []
-            inertias = []
-            mapping1 = {}
-            mapping2 = {}
-            K = range(1, 20)
+        if (elbow == 'yes'):
+            if (len(df_norm.index) <= max_samples):
+                #We calculate all kmeans clusters with k 1 to 20 so we can show the elbow method plots
+                print(">>> Performing kmeans elbow method =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True) 
+                distortions = []
+                inertias = []
+                mapping1 = {}
+                mapping2 = {}
+                K = range(1, 20)
  
-            for k in K:
-                kmeanModel = KMeans(n_clusters=k).fit(adata.obsm['X_pca'])
-                kmeanModel.fit(adata.obsm['X_pca'])
+                for k in K:
+                    kmeanModel = KMeans(n_clusters=k).fit(adata.obsm['X_pca'])
+                    kmeanModel.fit(adata.obsm['X_pca'])
  
-                distortions.append(sum(np.min(cdist(adata.obsm['X_pca'], kmeanModel.cluster_centers_,
+                    distortions.append(sum(np.min(cdist(adata.obsm['X_pca'], kmeanModel.cluster_centers_,
                                         'euclidean'), axis=1)) / adata.obsm['X_pca'].shape[0])
-                inertias.append(kmeanModel.inertia_)
+                    inertias.append(kmeanModel.inertia_)
  
-                mapping1[k] = sum(np.min(cdist(adata.obsm['X_pca'], kmeanModel.cluster_centers_,
+                    mapping1[k] = sum(np.min(cdist(adata.obsm['X_pca'], kmeanModel.cluster_centers_,
                                    'euclidean'), axis=1)) / adata.obsm['X_pca'].shape[0]
-                mapping2[k] = kmeanModel.inertia_
-                print(">>> Kmeans cluster calculated with k",k," =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True) 
+                    mapping2[k] = kmeanModel.inertia_
+                    print(">>> Kmeans cluster calculated with k",k," =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True) 
     
-            plt.figure()
-            plt.plot(K, distortions, 'bx-')
-            plt.xlabel('Values of K')
-            plt.ylabel('Distortion')
-            plt.title('The Elbow Method using Distortion')
-            plt.savefig(data_folder + '/analysis/downstream/elbow_distortion.jpg')
-            plt.clf()
-            plt.close()
+                plt.figure()
+                plt.plot(K, distortions, 'bx-')
+                plt.xlabel('Values of K')
+                plt.ylabel('Distortion')
+                plt.title('The Elbow Method using Distortion')
+                plt.savefig(data_folder + '/analysis/downstream/elbow_distortion.jpg')
+                plt.clf()
+                plt.close()
     
-            plt.figure()
-            plt.plot(K, inertias, 'bx-')
-            plt.xlabel('Values of K')
-            plt.ylabel('Inertia')
-            plt.title('The Elbow Method using Inertia')
-            plt.savefig(data_folder + '/analysis/downstream/elbow_inertia.jpg')
-            plt.clf()
-            plt.close()
-            print(">>> Elbow method calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True) 
-        else:
-            print(">>> Dataset too big to perform elbow method =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)  
+                plt.figure()
+                plt.plot(K, inertias, 'bx-')
+                plt.xlabel('Values of K')
+                plt.ylabel('Inertia')
+                plt.title('The Elbow Method using Inertia')
+                plt.savefig(data_folder + '/analysis/downstream/elbow_inertia.jpg')
+                plt.clf()
+                plt.close()
+                print(">>> Elbow method calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True) 
+            else:
+                print(">>> Dataset too big to perform elbow method =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)  
 
     
         #We print the complete spatial kmeans cluster and all related information. Please note that the k used is the one passad as parameter (or 10 by default) 
@@ -419,11 +422,15 @@ def clustering(df_norm, markers):
             df['leiden'] = df['leiden'].fillna('')
             leiden_color_list = adata.uns['leiden_colors']
             df['leiden_color'] = df.apply(lambda row: generate_leiden_color(row['leiden'], leiden_color_list), axis=1)
+            df_norm['leiden'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden']).astype(str)
+            df_norm['leiden_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden_color']).astype(str)
         if (kmeans == 'yes'):        
             #We add to the original cell segmentation csv file the calculated kmeans group for each cell
             df['kmeans'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans']).astype(str)
             df['kmeans'] = df['kmeans'].fillna('')
+            df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
         df.to_csv(data_folder + '/analysis/cell_data.csv', index=False)
+        df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_norm.csv', index=False)
         
         
 #Function to handle the command line parameters passed
