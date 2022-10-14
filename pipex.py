@@ -2,6 +2,7 @@ import os
 import sys
 import datetime
 import psutil
+import shutil
 import fnmatch
 
 
@@ -9,12 +10,14 @@ def batch_processor():
     batch_filename = './pipex_batch_list.txt'
     python_command = './bin/python -u '
     pidfile_filename = './RUNNING'
+    log_filename = './log.txt'
     if "PIPEX_DATA" not in os.environ:
         os.environ['PIPEX_DATA'] = './data'
     if "PIPEX_WORK" in os.environ:
         batch_filename = './work/pipex_batch_list.txt'
         python_command = 'python -u '
         pidfile_filename = './work/RUNNING'
+        log_filename = './work/log.txt'
 
     print(">>> Start time pipex =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
@@ -48,6 +51,11 @@ def batch_processor():
             print(">>> Processing next job =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
             print('>>>    ' + curr_command.strip())
             os.system(python_command + curr_command.strip())
+            if curr_command.index('-data=') > 0:
+                arg_start_index = curr_command.index('-data=') + 6
+                arg_end_index = curr_command.index('-', arg_start_index) - 1
+                curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
+                shutil.copyfile(log_filename, curr_data_folder + '/' + os.path.basename(log_filename))
  
     batch_file.close()
 
