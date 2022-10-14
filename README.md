@@ -97,7 +97,7 @@ There are currently available the following commands:
   - `-nuclei_marker=<name before . in image file>` : example, from image filename "reg001_cyc001_ch001_DAPI.tif"-> -nuclei_marker=DAPI
   - `-nuclei_diameter=<number of pixels>` : example -> -nuclei_diameter=20. **OBS**: this is an approximate guideline, Stardist is smart enough to adapt around 50% above and below.
   - `-nuclei_expansion=<number of pixels, can be 0>` : example -> -nuclei_expansion=20. **OBS**: the algorithm is smart enough to not overlap the expansions
-  - `-nuclei_definition=<optional, gradation between 0.001 and 0.999>` : example -> -nuclei_definition=0.5. **OBS**: this instructs to Stardist algorithm to be less or more strict in its detections. Leave it empty or at 0 for default Stardist model value.
+  - `-nuclei_definition=<optional, gradation between 0.001 and 0.999>` : example -> -nuclei_definition=0.5. **OBS**: this instructs to Stardist algorithm to be less or more strict in its detections. Leave it empty or at 0 for default Stardist model value. Also, if you are using big images and PIPEX is downscaling them, use a low value (i.e 0.1) to help Stardist work better with smaller nuclei.
   - `-membrane_marker=<optional, name before . in image file>` : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1. **OBS**: if you don't use membrane marker you will obtain a basic Stardist segmentation with the specified nuclei expansion
   - `-membrane_diameter=<optional, number of pixels>` : example -> -membrane_diameter=25. **OBS**: required if membrane marker is used, this is an approximate guideline, the custom watershed segmentation is smart enough to adapt.
   - `-membrane_compactness=<optional, "squareness" of the membrane, gradation between 0.001 and 0.999>` : example -> -membrane_compactness=0.5. **OBS**: required if membrane marker is used, this instructs the watershed algorithm to try to keep a more or less (bigger value is more) square-type segmentation.
@@ -238,7 +238,7 @@ PIPEX's custom cell segmentation features a combination of different techniques 
 
     - It can only detect convex shapes. This is still a limitation in PIPEX, although most of the cells seems to be compliant.
     - It only detects cell nuclei. PIPEX offers the possibility to automatically expand this detection and try to fit it into the region defined by an optional membrane marker.
-    - With the regular usage proposed in its documentation, Stardist is prone to out of memory errors and can't address big resolution images. PIPEX uses an internal method present in Stardist's source code to reduce the memory usage and an optional swap memory mechanism (only in linux) to dynamically adapt to different images.
+    - With the regular usage proposed in its documentation, Stardist is prone to out of memory errors and can't address big resolution images. PIPEX uses an internal method present in Stardist's source code to reduce the memory usage and an optional swap memory mechanism (only in linux) to dynamically adapt to different images. In addition, for really big images that can't fit your memory allocation, PIPEX downscales them to work and upscales the results seamlessly.
 
 2. After Stardist segmentation, PIPEX (optionally) expands the detections to the required size, taking care to not overlap the neighboring cells.
 
