@@ -59,7 +59,7 @@ def downscale_images(np_img):
             nuclei_expansion = nuclei_expansion / pipex_scale_factor
             global membrane_diameter
             membrane_diameter = membrane_diameter / pipex_scale_factor
-        return resize(np_img, (len(np_img) / pipex_scale_factor, len(np_img[0]) / pipex_scale_factor))
+        return resize(np_img, (len(np_img) / pipex_scale_factor, len(np_img[0]) / pipex_scale_factor), order=0, preserve_range=True, anti_aliasing=False).astype('uint16')
     return np_img
 
 
@@ -75,10 +75,12 @@ def upscale_results(df):
         
         labels = np.load(data_folder + '/analysis/segmentation_data.npy')
         labels = labels.repeat(pipex_scale_factor, axis=0).repeat(pipex_scale_factor, axis=1) 
+        np.save(data_folder + '/analysis/segmentation_data.npy', labels)
         
+        pipex_scale_factor_n2 = pow(pipex_scale_factor, 2)
         df['x'] = df['x'] * pipex_scale_factor  
         df['y'] = df['y'] * pipex_scale_factor 
-        df['size'] = df['size'].apply(lambda x: int(pow((math.sqrt(x) * pipex_scale_factor), 2)))
+        df['size'] = df['size'].apply(lambda x: int(x * pipex_scale_factor_n2))
         
     
 def cell_segmentation(nuclei_img_orig, membrane_img_orig):    
@@ -453,7 +455,7 @@ if __name__ =='__main__':
                 else:
                     for marker in measure_markers:
                         if marker + '.' in file:
-                            marker_calculation(marker, downscale_images(imread(file)), cellLabels, data_table)
+                            marker_calculation(marker, downscale_images(imread(file_path)), cellLabels, data_table)
                             break
             except:
                 next_try = True
