@@ -62,6 +62,7 @@ tooltip_36 = '<optional, yes or no to apply log1p normalization to the markers>:
 tooltip_37 = '<optional, yes or no to apply quantile normalization to the markers>: \nexample -> yes'
 tooltip_38 = '<optional, name of the column in cell_data.csv to perform batch correction by>: \nexample -> batch_id'
 tooltip_39 = '<optional, yes or no to apply 0 to 1 re-scale normalization>: \nexample -> yes'
+tooltip_40 = '<optional, yes or no to use binarized columns for clustering>: \nexample -> no'
      
 sg.theme('LightBrown10')
 
@@ -97,6 +98,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text(' NOTE: requires previous \'Segmentation\' results')],
           [sg.Text('  - Image size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='1000',s=20,disabled=True, key='-ANALYSIS_SIZE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_9)],
           [sg.Text('  - Analysis markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-ANALYSIS_MARKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_27)],
+          [sg.Text('  - Use binarized markers', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_USEBIN-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_40)],
           [sg.Text('  - Cell size top crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='5',s=20,disabled=True, key='-ANALYSIS_TOPTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_28)],
           [sg.Text('  - Cell size bottom crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='5',s=20,disabled=True, key='-ANALYSIS_BOTTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_34)],
           [sg.Text('  - Custom Cell Profiling filtering:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_CUSFIL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_35)],
@@ -193,6 +195,7 @@ while True:
     if event == '-ANALYSIS-':
         window['-ANALYSIS_SIZE-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_MARKER-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_USEBIN-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_TOPTHR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_BOTTHR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_CUSFIL-'].update(disabled=(not values['-ANALYSIS-']))
@@ -300,7 +303,8 @@ if values['-ANALYSIS-']:
         ' -log_norm=' + ('yes' if values['-ANALYSIS_LOGNOR-'] else 'no') + 
         ' -std_norm=' + ('yes' if values['-ANALYSIS_STDNOR-'] else 'no') + 
         ' -quantile_norm=' + ('yes' if values['-ANALYSIS_QUANOR-'] else 'no') + 
-        ' -batch_corr=' + values['-ANALYSIS_BATCOR-'])
+        ' -batch_corr=' + values['-ANALYSIS_BATCOR-'] +
+        ' -use_bin=' + ('yes' if values['-ANALYSIS_USEBIN-'] else 'no'))
     if (values['-ANALYSIS_LEIDEN-']): 
         batch_list = (batch_list +  
             ' -leiden=' + ('yes' if values['-ANALYSIS_LEIDEN-'] else 'no'))    

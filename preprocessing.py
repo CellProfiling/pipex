@@ -39,6 +39,8 @@ bin_max = 2
        
        
 def rescale_tile_intensity(x, mean_in, mean_factor, dev_in, dev_factor, bins):
+    if x == 0:
+        return
     result = min(max(0, x + (mean_in * mean_factor) - mean_in), 1.0)
     result_dev = ((x - mean_in) * dev_factor) - (x - mean_in)
     result = min(max(0, result + result_dev if x >= mean_in else - result_dev), 1.0) 

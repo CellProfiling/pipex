@@ -28,6 +28,7 @@ std_norm = "no"
 log_norm = "no"
 quantile_norm = "no"
 batch_corr = ""
+use_bin = "no"
 leiden = "no"
 kmeans = "no"
 elbow = "no"
@@ -46,10 +47,13 @@ def data_calculations():
     markers = list(df_norm.columns.values)
     markers = markers[(df_norm.columns.get_loc("y") + 1):]
     #saveguard if analysis.py has been executed before and cluster_id + cluster_color already exists
-    if 'leiden' in markers:
-        markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc("leiden"))]
-    elif 'kmeans' in markers:
-        markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc("kmeans"))]
+    if any("_bin_thres" in s for s in markers):
+        markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc(list(filter(lambda x: '_bin_thres' in x, markers))[0]))]
+    else:
+        if 'leiden' in markers:
+            markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc("leiden"))]
+        elif 'kmeans' in markers:
+            markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc("kmeans"))]
 
     #If a specific list of markers is informed, we use it
     if len(analysis_markers) > 0:
@@ -373,7 +377,7 @@ def clustering(df_norm, markers):
         plt.close()
         
         plt.figure()
-        sc.pl.spatial(adata, color=['kmeans'], spot_size=20, palette='tab10', show=False, save='_spatial_kmeans')
+        sc.pl.spatial(adata, color=['kmeans'], spot_size=20, show=False, save='_spatial_kmeans')
         plt.clf()
         plt.close()
 
@@ -428,7 +432,20 @@ def clustering(df_norm, markers):
             #We add to the original cell segmentation csv file the calculated kmeans group for each cell
             df['kmeans'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans']).astype(str)
             df['kmeans'] = df['kmeans'].fillna('')
+            kmeans_color_list = adata.uns['kmeans_colors']
+            df['kmeans_color'] = df.apply(lambda row: generate_leiden_color(row['kmeans'], kmeans_color_list), axis=1)
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
+            df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
+
+            df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
+
+            plt.figure()
+            fig1, ax1 = plt.subplots(figsize=(7,5))
+            sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
+            plt.savefig(data_folder + '/analysis/downstream/kmeans_clusters_correlation_heatmap.jpg')
+            plt.clf()
+            plt.close()
+
         df.to_csv(data_folder + '/analysis/cell_data.csv', index=False)
         df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_norm.csv', index=False)
         
@@ -436,12 +453,12 @@ def clustering(df_norm, markers):
 #Function to handle the command line parameters passed
 def options(argv):
     if (len(argv) == 0):
-       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
+       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, yes or no to use binarized columns for clustering> : example -> -use_bin=no\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
+                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, yes or no to use binarized columns for clustering> : example -> -use_bin=no\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
@@ -473,6 +490,9 @@ def options(argv):
             elif arg.startswith('-batch_corr='):
                 global batch_corr
                 batch_corr = arg[12:]
+            elif arg.startswith('-use_bin='):
+                global use_bin
+                use_bin = arg[9:]
             elif arg.startswith('-leiden='):
                 global leiden
                 leiden = arg[8:]
@@ -510,7 +530,10 @@ if __name__ =='__main__':
     sns.set(font_scale=0.6)
 
     df_norm, markers = data_calculations()
-    
+
+    if use_bin == 'yes':
+        markers = [marker + '_bin' for marker in markers]
+
     clustering(df_norm, markers)
     
     print(">>> End time analysis =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)

@@ -18,6 +18,7 @@ import cv2
 
 from skimage.io import imsave, imread
 from skimage.exposure import is_low_contrast, equalize_adapthist
+from skimage.filters import threshold_multiotsu
 from skimage.measure import regionprops
 from skimage.segmentation import watershed, mark_boundaries, expand_labels
 from skimage.transform import resize
@@ -279,10 +280,14 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 #Function to calculate the marker intensities for each cell
 def marker_calculation(marker, marker_img, cellLabels, data_table):
     #applying segmentation mask over the marker image
+    c_otsu = threshold_multiotsu(marker_img, 3)
     markerProperties = regionprops(cellLabels, marker_img)
     #obtaining mean intensity per cell
     for cell in markerProperties:
+        cell_binarized_threshold = c_otsu[0]
         data_table[cell.label][marker] = cell.intensity_mean
+        data_table[cell.label][marker + '_bin_thres'] = cell_binarized_threshold / 10
+        data_table[cell.label][marker + '_bin'] = 1 if cell.intensity_mean >= cell_binarized_threshold / 10 else 0
         
     print(">>> Marker " + marker + " calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
@@ -478,6 +483,11 @@ if __name__ =='__main__':
     #dumpming data_table in cell_data.csv file
     df = pd.DataFrame.from_dict(data_table, orient='index')
     upscale_results(df)
+    binarized_marker_columns = []
+    for marker in measure_markers:
+        binarized_marker_columns.append(marker + "_bin_thres")
+        binarized_marker_columns.append(marker + "_bin")
+    measure_markers.extend(binarized_marker_columns)
     measure_markers.insert(0, 'y')
     measure_markers.insert(0, 'x')
     measure_markers.insert(0, 'size')
