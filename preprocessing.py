@@ -422,12 +422,11 @@ def preprocess_image(f_name, numpy_img):
         
         if (light_gradient > 1):
             gradient_data = generate_tile_gradient_data(np_img, bins, tile_size)
+            apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data)
+
+        np.nan_to_num(np_img, copy=False)
 
         tile_data = generate_tile_compensation_data(np_img, bins, tile_size)
-
-        if (light_gradient > 1):
-            apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data)
-                
         apply_tile_compensation(f_name, np_img, bins, tile_data, tile_size, stitch_size)
         
     if (exposure != 1):
