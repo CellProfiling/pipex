@@ -2,7 +2,6 @@ import sys
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import datetime
-import argparse
 import fnmatch
 import PIL
 import numpy as np
@@ -130,7 +129,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     sdLabels = None
     _ = None
     #for big images (>stardist_tile_threshold), run predict_instances_big method using 2048 square tiles
-    if len(nuclei_img) + len(nuclei_img[0]) > stardist_tile_threshold:
+    if max(len(nuclei_img), len(nuclei_img[0])) > stardist_tile_threshold:
         sdLabels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None))
     else:
         sdLabels, _ = model.predict_instances(nuclei_img,axes='YX',prob_thresh=(nuclei_definition if nuclei_definition > 0 else None))
@@ -280,11 +279,12 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 #Function to calculate the marker intensities for each cell
 def marker_calculation(marker, marker_img, cellLabels, data_table):
     #applying segmentation mask over the marker image
-    c_otsu = threshold_multiotsu(marker_img, 3)
+    marker_img_otsu = np.uint8((marker_img / 65535.0) * 255)
+    c_otsu = threshold_multiotsu(marker_img_otsu, 3)
     markerProperties = regionprops(cellLabels, marker_img)
     #obtaining mean intensity per cell
     for cell in markerProperties:
-        cell_binarized_threshold = c_otsu[0]
+        cell_binarized_threshold = (c_otsu[0] / 255.0) * 65535
         data_table[cell.label][marker] = cell.intensity_mean
         data_table[cell.label][marker + '_bin_thres'] = cell_binarized_threshold / 10
         data_table[cell.label][marker + '_bin'] = 1 if cell.intensity_mean >= cell_binarized_threshold / 10 else 0
