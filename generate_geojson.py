@@ -10,25 +10,33 @@ import geojson
 
 
 data_folder = os.environ.get('PIPEX_DATA')
-expand = "no"
+included_markers = []
+cluster_id = ""
+cluster_color = ""
 
 
 #Function to handle the command line parameters passed
 def options(argv):
     if (len(argv) == 0):
-       print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-expand=<optional, yes or no to add additional fields from cell_data.csv> : example -> -expand=yes', flush=True)
+       print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-included_markers=<optional, list of present specific markers to include> : example -> -included_markers=AMY2A,SST,GORASP2\n\t-cluster_id=<optional, name of the column to add as cluster id information from cell_data.csv> : example -> -cluster_id=kmeans\n\t-cluster_color=<optional, name of the column to add as cluster information color from cell_data.csv> : example -> -cluster_color=kmeans_color', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-expand=<optional, yes or no to add additional fields from cell_data.csv> : example -> -expand=yes', flush=True)
+                print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-included_markers=<optional, list of present specific markers to include> : example -> -included_markers=AMY2A,SST,GORASP2\n\t-cluster_id=<optional, name of the column to add as cluster id information from cell_data.csv> : example -> -cluster_id=kmeans\n\t-cluster_color=<optional, name of the column to add as cluster information color from cell_data.csv> : example -> -cluster_color=kmeans_color', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
                 data_folder = arg[6:]
-            elif arg.startswith('-expand='):
-                global expand
-                expand = arg[8:]
+            elif arg.startswith('-included_markers='):
+                global included_markers
+                included_markers = arg[18:].split(",")
+            elif arg.startswith('-cluster_id='):
+                global cluster_id
+                cluster_id = arg[12:]
+            elif arg.startswith('-cluster_color='):
+                global cluster_color
+                cluster_color = arg[15:]
                 
 
 if __name__ =='__main__':
@@ -53,10 +61,14 @@ if __name__ =='__main__':
     #saveguard if analysis.py has been executed before and cluster_id + cluster_color already exists
     if 'cluster_id' in markers:
         markers = markers[:-(len(df.columns) - df.columns.get_loc("cluster_id"))]
-    elif 'leiden_id' in markers:
-        markers = markers[:-(len(df.columns) - df.columns.get_loc("leiden_id"))]
-    elif 'kmeans_id' in markers:
-        markers = markers[:-(len(df.columns) - df.columns.get_loc("kmeans_id"))]
+    elif 'leiden' in markers:
+        markers = markers[:-(len(df.columns) - df.columns.get_loc("leiden"))]
+    elif 'kmeans' in markers:
+        markers = markers[:-(len(df.columns) - df.columns.get_loc("kmeans"))]
+
+    # If a specific list of markers is informed, we use it
+    if len(included_markers) > 0:
+        markers = included_markers
              
     #calculate segmentation polygons via fast chaincodes from diplib
     chaincodes = dip.GetImageChainCodes(labels.astype('uint32'))
@@ -92,11 +104,11 @@ if __name__ =='__main__':
                 "value" : str(df[cell_row][marker].values[0]) 
                 })
         
-        #if expand parameter is selected, add cluster_id and cluster_color
-        if expand == 'yes' and len(df[cell_row].cluster_id) > 0:
+        #if cluster_id parameter is selected, add cluster_id and cluster_color
+        if cluster_id != '' and len(df[cell_row][cluster_id]) > 0:
             cell_data["properties"]["classification"] = {
-                "name": str(df[cell_row].cluster_id.values[0]),
-                "colorRGB": str(df[cell_row].cluster_color.values[0])
+                "name": str(df[cell_row][cluster_id].values[0]),
+                "colorRGB": str(df[cell_row][cluster_color].values[0] if cluster_color != '' else '')
                 }
         GEOdata.append(cell_data)
 

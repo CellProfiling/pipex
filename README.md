@@ -124,7 +124,9 @@ There are currently available the following commands:
 
 - `generate_geojson.py` : generates a GEOjson file to be imported in QuPath. MUST be run AFTER a segmentation and optionally after an analysis (if you want the default clustering). Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
-  - `-expand=<optional, yes or no to add additional fields from cell_data.csv>` : example -> -expand=yes. **OBS**: this uses the `cluster_id` and `cluster_color` columns of the cell_data.csv to add clustering data to QuPath detections.
+  - `-included_markers=<optional, list of present specific markers to inlcude>` : example -> -included_markers=AMY2A,SST,GORASP2. *OBS**: if this is not set, the process will try to use all present markers
+  - `-cluster_id=<optional, name of the column to add as cluster id information from cell_data.csv>` : example -> -cluster_id=kmeans. **OBS**: this uses the selected column of the cell_data.csv to add clustering data to QuPath detections.
+  - `-cluster_color=<optional, name of the column to add as cluster color information from cell_data.csv>` : example -> -cluster_color=kmeans_color. **OBS**: this uses the selected column of the cell_data.csv to add clustering data to QuPath detections.
   
 - `generate_filtered_masks.py` : can filter and/or tile the generated segmentation mask. It filters the cells present in the postprocessed mask by an arbritary column/values in the cell_data.csv file and/or cuts it in tiles of the specified size. Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder

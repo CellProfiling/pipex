@@ -279,13 +279,16 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 #Function to calculate the marker intensities for each cell
 def marker_calculation(marker, marker_img, cellLabels, data_table):
     #applying segmentation mask over the marker image
-    marker_img_otsu = np.uint8((marker_img / 65535.0) * 255)
+    marker_img_otsu = (marker_img - np.amin(marker_img)) / (np.amax(marker_img) - np.amin(marker_img))
+    marker_img_otsu = np.uint8(marker_img_otsu * 255)
     c_otsu = threshold_multiotsu(marker_img_otsu, 3)
+    cell_binarized_threshold = ((c_otsu[0] / 255.0) * 65535 - np.amin(marker_img)) / (np.amax(marker_img) - np.amin(marker_img))
     markerProperties = regionprops(cellLabels, marker_img)
     #obtaining mean intensity per cell
     for cell in markerProperties:
-        cell_binarized_threshold = (c_otsu[0] / 255.0) * 65535
         data_table[cell.label][marker] = cell.intensity_mean
+        cell_image = cell.image_intensity
+        data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image[cell_image != 0], 0.9)
         data_table[cell.label][marker + '_bin_thres'] = cell_binarized_threshold / 10
         data_table[cell.label][marker + '_bin'] = 1 if cell.intensity_mean >= cell_binarized_threshold / 10 else 0
         
@@ -381,8 +384,9 @@ if __name__ =='__main__':
                             nuclei_img = downscale_images(page.asarray())
                         if biomarker == membrane_marker:
                             membrane_img = downscale_images(page.asarray())
-        except:
-            print('>>> checking type of ' + file_path + ', not TIFF', flush=True)  
+        except Exception as e:
+            print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
+            print('>>> ', e, flush=True)
             next_try = True
                 
         if next_try:
@@ -392,8 +396,9 @@ if __name__ =='__main__':
                     nuclei_img = downscale_images(imread(file_path))
                 if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
                     membrane_img = downscale_images(imread(file_path))
-            except:
+            except Exception as e:
                 next_try = True
+                print('>>> ', e, flush=True)
 
         if next_try:
             try:
@@ -401,8 +406,9 @@ if __name__ =='__main__':
                     nuclei_img = downscale_images(np.array(PIL.Image.open(file_path)))
                 if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
                     membrane_img = downscale_images(np.array(PIL.Image.open(file_path)))
-            except:
-                print('>>> Could not read image ' + file_path, flush=True)  
+            except Exception as e:
+                print('>>> Could not read image ' + file_path, flush=True)
+                print('>>> ', e, flush=True)
         
     #performing segmentation    
     cellLabels = cell_segmentation(nuclei_img, membrane_img)
@@ -446,8 +452,9 @@ if __name__ =='__main__':
                             marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
                         elif biomarker in measure_markers:
                             marker_calculation(biomarker, downscale_images(page.asarray()), cellLabels, data_table)
-        except:
-            print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)  
+        except Exception as e:
+            print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
+            print('>>> ', e, flush=True)
             next_try = True
 
         if next_try:
@@ -462,8 +469,9 @@ if __name__ =='__main__':
                         if marker + '.' in file:
                             marker_calculation(marker, downscale_images(imread(file_path)), cellLabels, data_table)
                             break
-            except:
+            except Exception as e:
                 next_try = True
+                print('>>> ', e, flush=True)
 
         if next_try:
             try:
@@ -476,8 +484,9 @@ if __name__ =='__main__':
                         if marker + '.' in file:
                             marker_calculation(marker, downscale_images(np.array(PIL.Image.open(file_path))), cellLabels, data_table)
                             break
-            except:
-                print('>>> Could not read image ' + file_path, flush=True) 
+            except Exception as e:
+                print('>>> Could not read image ' + file_path, flush=True)
+                print('>>> ', e, flush=True)
                 
 
     #dumpming data_table in cell_data.csv file
@@ -485,6 +494,7 @@ if __name__ =='__main__':
     upscale_results(df)
     binarized_marker_columns = []
     for marker in measure_markers:
+        binarized_marker_columns.append(marker + "_local_90")
         binarized_marker_columns.append(marker + "_bin_thres")
         binarized_marker_columns.append(marker + "_bin")
     measure_markers.extend(binarized_marker_columns)

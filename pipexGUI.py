@@ -32,7 +32,7 @@ tooltip_6 = '<optional, "squareness" of the membrane, gradation between 0.001 an
 tooltip_7 = '<yes or no to enhance poor images>: \nexample -> yes'
 tooltip_8 = '<list of markers names before . in image files>: \nexample -> DAPI1,CDH1,AMY2A,SST,GORASP2'
 tooltip_9 = '<optional, one-side approximate resolution>: \nexample -> 1000'
-tooltip_10 = '<optional, yes or no to add additional fields from cell_data.csv>: \nexample -> =yes'
+tooltip_10 = '<optional, name of the column to add as cluster id information from cell_data.csv>: \nexample -> kmeans'
 tooltip_11 = '<name of the column in cell_data.csv to filter the cells by>: \nexample -> cluster_id'
 tooltip_12 = '<values, comma-separated, present in the selected colum of cell_data.csv to filter the cells by>: \nexample -> 3,6,7'  
 tooltip_13 = '<number of pixels>: \nexample -> 2048'  
@@ -63,6 +63,8 @@ tooltip_37 = '<optional, yes or no to apply quantile normalization to the marker
 tooltip_38 = '<optional, name of the column in cell_data.csv to perform batch correction by>: \nexample -> batch_id'
 tooltip_39 = '<optional, yes or no to apply 0 to 1 re-scale normalization>: \nexample -> yes'
 tooltip_40 = '<optional, yes or no to use binarized columns for clustering>: \nexample -> no'
+tooltip_41 = '<optional, list of present specific markers to inlcude>: \nexample -> AMY2A,SST,GORASP2'
+tooltip_42 = '<optional, name of the column to add as cluster color information from cell_data.csv>: \nexample -> kmeans_color'
      
 sg.theme('LightBrown10')
 
@@ -114,7 +116,9 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Checkbox('QuPath GeoJSON', font='any 12 bold', key='-QUPATH-', enable_events=True)],
           [sg.Text(' NOTE: requires previous \'Segmentation\' results', pad=((20,0), (0,0)))],
           [sg.Text(' NOTE: requires a previous \'Downstream analysis\' results if you want clustering data', pad=((20,0), (0,0)))],
-          [sg.Text('  - Add cluster information:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-QUPATH_CLUSTER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_10)],
+          [sg.Text('  - Included markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-QUPATH_MARKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_41)],
+          [sg.Text('  - Cluster id column name:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-QUPATH_CLUID-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_10)],
+          [sg.Text('  - Cluster color column name:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-QUPATH_CLUCOL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_42)],
           [sg.Text('_'*85)],
           [sg.Checkbox('Filter segmentation', font='any 12 bold', key='-FILTERED-', enable_events=True)],
           [sg.Text(' NOTE: requires previous \'Segmentation\' results', pad=((20,0), (0,0)))],
@@ -214,7 +218,9 @@ while True:
             window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
             window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
     if event == '-QUPATH-':
-        window['-QUPATH_CLUSTER-'].update(disabled=(not values['-QUPATH-']))
+        window['-QUPATH_MARKER-'].update(disabled=(not values['-QUPATH-']))
+        window['-QUPATH_CLUID-'].update(disabled=(not values['-QUPATH-']))
+        window['-QUPATH_CLUCOL-'].update(disabled=(not values['-QUPATH-']))
     if event == '-FILTERED-':
         window['-FILTERED_CLUFIL-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_FIELD-'].update(disabled=(not values['-FILTERED-']))
@@ -319,8 +325,16 @@ if values['-ANALYSIS-']:
             
 if values['-QUPATH-']:
     batch_list = (batch_list + '\n' + 
-        'generate_geojson.py -data=' + batch_data +
-        ' -expand=' + ('yes' if values['-QUPATH_CLUSTER-'] else 'no'))
+        'generate_geojson.py -data=' + batch_data)
+    if (values['-QUPATH_MARKER-'] != ''):
+        batch_list = (batch_list +
+                      ' -included_markers=' + values['-QUPATH_MARKER-'])
+    if (values['-QUPATH_CLUID-'] != ''):
+        batch_list = (batch_list +
+                      ' -cluster_id=' + values['-QUPATH_CLUID-'])
+    if (values['-QUPATH_CLUCOL-'] != ''):
+        batch_list = (batch_list +
+                      ' -cluster_color=' + values['-QUPATH_CLUCOL-'])
         
 if values['-FILTERED-']:
     batch_list = (batch_list + '\n' + 
