@@ -288,7 +288,8 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
     for cell in markerProperties:
         data_table[cell.label][marker] = cell.intensity_mean
         cell_image = cell.image_intensity
-        data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image[cell_image != 0], 0.9)
+        cell_image = cell_image[(cell_image != 0) & (~np.isnan(cell_image))]
+        data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image, 0.9) if len(cell_image) > 0 else 0
         data_table[cell.label][marker + '_bin_thres'] = cell_binarized_threshold / 10
         data_table[cell.label][marker + '_bin'] = 1 if cell.intensity_mean >= cell_binarized_threshold / 10 else 0
         

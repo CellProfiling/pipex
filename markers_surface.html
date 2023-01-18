@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+    <script src="https://cdn.plot.ly/plotly-2.17.1.min.js"></script></head>
+<body>
+    <div class="d-flex flex-row justify-content-center">
+        <div id="pipex" class="d-flex justify-content-center plotly-graph-div" style="margin-top:10px"></div>
+        <div class="d-flex flex-column" style="margin-top:70px;margin-left:20px">
+            <div><blockquote class="blockquote text-center"><p class="mb-0">Selected markers</p></blockquote></div>
+            <div id="markers_div" class="d-flex align-items-start flex-column"></div>
+        </div>
+    </div>
+    <script type="text/javascript">
+        var markers = $$$MARKERS$$$;
+        var z = $$$DATA$$$;
+        var tickvalues = $$$TICKS$$$;
+        //var markers = ["DAPI", "CBS", "GCG"];
+        //var z = [[[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2]],[[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2]],[[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2],[0.2,0.2,0.3,0.4,0.2]]];
+        //var tickvalues = [0,10,20,30,40];
+        window.PLOTLYENV = window.PLOTLYENV || {};
+        var colors = ["rgb(255,0,0)", "rgb(0,255,0)", "rgb(0,0,255)", "rgb(255,255,0)", "rgb(255,0,255)", "rgb(0,255,255)", "rgb(255,127,0)", "rgb(127,255,0)", "rgb(255,0,127)", "rgb(127,0,255)", "rgb(0,255,127)", "rgb(0,127,255)"];
+        var plot_info = [];
+        var layout = {
+            autosize: false,
+            width: 1000,
+            height: 1000,
+            margin: {
+                l: 50,
+                r: 50,
+                b: 100,
+                t: 100,
+                pad: 4
+            },
+            showlegend : false,
+            title : "Marker surface comparison",
+            scene : {xaxis : {ticktext : tickvalues , tickvals : [0,20,40,60,80]}, yaxis : {ticktext : tickvalues, tickvals : [0,20,40,60,80]}}
+        };
+        var config = {responsive : true};
+
+        var markerSelect = document.getElementById("markers_div");
+        for (var i = 0; i < markers.length; i++) {
+            $("#markers_div").append("<div class=\"form-check form-check-inline\"><input class=\"form-check-input\" type=\"checkbox\" id=\"inlineCheckbox" + i + "\" value=\"option" + i + "\" onchange=\"plot();\"><label id=\"inlineLabel" + i + "\" class=\"form-check-label\" for=\"inlineCheckbox" + i + "\">" + markers[i] + "</label></div>");
+        }
+        $("#inlineCheckbox0").prop( "checked", true );
+
+        function plot() {
+            plot_info = [];
+
+            num_sel_markers = 1;
+            for (var i = 0; i < markers.length; i++) {
+                if (num_sel_markers == colors.length) {
+                    $("#inlineCheckbox" + i).prop( "checked", false );
+                    $("#inlineLabel" + i).css( "color", "rgb(0,0,0)" );
+                } else if ($("#inlineCheckbox" + i).prop( "checked") && num_sel_markers - 1 < colors.length) {
+                    scaled_z = JSON.parse(JSON.stringify(z[i]));
+                    for (var k = 0; k < scaled_z.length; k++) {
+                        scaled_z[k] = scaled_z[k].map((x) => x + num_sel_markers - 1);
+                    }
+                    plot_info.push({
+                        colorscale : [[0.0,"rgba(255,255,255,0)"],[0.1,"rgba(255,255,255,0.35)"],[1.0,colors[num_sel_markers - 1]]],
+                        contours : {z : {highlightcolor : colors[num_sel_markers - 1], project : {z : true}, show : true, usecolormap : true}},
+                        showscale : num_sel_markers == 1,
+                        hoverinfo : "z",
+                        name : markers[i],
+                        z: scaled_z,
+                        type : "surface"
+                    });
+                    $("#inlineLabel" + i).css( "color", colors[num_sel_markers - 1]);
+                    num_sel_markers = num_sel_markers + 1;
+                } else {
+                    $("#inlineLabel" + i).css( "color", "rgb(0,0,0)" );
+                }
+            }
+
+            if (document.getElementById("pipex")) {
+                Plotly.newPlot("pipex", plot_info, layout, config);
+            }
+        }
+
+        plot();
+    </script>
+</body>
+</html>

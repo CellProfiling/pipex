@@ -3,7 +3,6 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import datetime
 import numpy as np
-import math
 import PIL
 import pandas as pd
 import scanpy as sc
@@ -11,10 +10,8 @@ import squidpy as sq
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
-from sklearn import metrics
 from scipy.spatial.distance import cdist
 import qnorm
-import umap
 from combat.pycombat import pycombat
 
 
@@ -149,7 +146,7 @@ def data_calculations():
     #for marker in markers:
     #    df_norm.loc[marker] = np.NaN
 
-    columns = ['marker', 'num_cells', 'percent_cells_50+', 'mean', 'median', 'std', 'q10', 'q25', 'q50', 'q75', 'q90']
+    columns = ['marker', 'num_cells', 'percent_cells_50+', 'mean', 'median', 'std', 'q10', 'q25', 'q50', 'q75', 'q90'] + markers
         
     #We create an extra pandas dataframe with global information about each marker. This will be a new output in PIPEX analysis step as a csv file called 'cell_data_markers.csv'
     df_ext = pd.DataFrame(columns=columns)
@@ -170,7 +167,7 @@ def data_calculations():
                 marker_tile = df_norm.loc[(df_norm['x'] > tile_min_x) & (df_norm['y'] > tile_min_y) & (df_norm['x'] <= tile_max_x) & (df_norm['y'] <= tile_max_y)]
                 
                 qif[i][j] = marker_tile[marker].sum() / (1844 ** 2)
-        row = {'marker': marker, 
+        row = {'marker': marker,
                'num_cells': len(marker_df), 
                'percent_cells_50+': (len(marker_df[(marker_df >= 0.5)]) / len(marker_df)) * 100, 
                'mean': marker_df.mean(), 
@@ -186,7 +183,7 @@ def data_calculations():
             for j in range(len(qif[0])):
                 row['QIF_' + str(i) + '_' + str(j)] = qif[i][j]
 
-        df_ext = df_ext.append(row, ignore_index = True)
+        df_ext = pd.concat([df_ext, pd.DataFrame([row])], ignore_index=True)
 
     for marker in markers:
         df_ext[marker] = df_corr[marker].values
@@ -206,9 +203,65 @@ def data_calculations():
     
     del df_corr
     del df_ext
-    
+
+    fill_surface_html_template(markers, df_norm)
+
     return df_norm, markers
-    
+
+
+#Function pass data to the surface html template
+def fill_surface_html_template(markers, df_norm):
+    html_template = open("markers_surface.html", "r")
+    html_content = html_template.read()
+    markers_formatted = "["
+    for marker in markers:
+        markers_formatted = markers_formatted + '\"' + marker + '\",'
+    markers_formatted = markers_formatted[:-1] + "]"
+    html_content = html_content.replace("$$$MARKERS$$$", markers_formatted)
+    minDim = min(min(df_norm['x'].values), min(df_norm['y'].values))
+    maxDim = max(max(df_norm['x'].values), max(df_norm['y'].values))
+    factor = int(maxDim / 100) + 1 if maxDim % 100 > 0 else 0
+    ticktext = [*range(minDim, maxDim, factor * 20)]
+    ticktext_formatted = "["
+    for tick in ticktext:
+        ticktext_formatted = ticktext_formatted + str(tick) + ','
+    ticktext_formatted = ticktext_formatted[:-1] + "]"
+    html_content = html_content.replace("$$$TICKS$$$", ticktext_formatted)
+    df_surface = df_norm
+    if std_norm != 'yes':
+        df_surface = df_norm.copy()
+        for marker in markers:
+            marker_min = df_surface[marker].min()
+            marker_max = df_surface[marker].max()
+            df_surface[marker] = df_surface[marker].apply(lambda x: (x - marker_min) / (marker_max - marker_min))
+    z = []
+    for marker in markers:
+        z.append([])
+    for x in range(minDim, maxDim, factor):
+        for m in range(len(markers)):
+            z_row = []
+            for y in range(minDim, maxDim, factor):
+                df_cell = df_surface[(df_surface['x'] >= x) & (df_surface['y'] >= y) & (df_surface['x'] < x + factor) & (df_surface['y'] < y + factor)]
+                if df_cell.empty:
+                    z_row.append(0)
+                else:
+                    z_row.append(df_cell.iloc[0][markers[m]])
+            z[m].append(z_row)
+    z_formatted = "["
+    for z_marker in z:
+        z_formatted = z_formatted + '['
+        for z_row in z_marker:
+            z_formatted = z_formatted + '['
+            for z_elem in z_row:
+                z_formatted = z_formatted + str(z_elem) + ','
+            z_formatted = z_formatted[:-1] + "],"
+        z_formatted = z_formatted[:-1] + "],"
+    z_formatted = z_formatted[:-1] + "]"
+    html_content = html_content.replace("$$$DATA$$$", z_formatted)
+    f = open(data_folder + '/analysis/downstream/markers_surface.html', 'w')
+    f.write(html_content)
+    f.close()
+
 
 #Function to convert regular RGB to packed integer
 def generate_leiden_color(leiden_id, leiden_color_list):
