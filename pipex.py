@@ -8,7 +8,9 @@ import fnmatch
 
 def batch_processor():
     batch_filename = './pipex_batch_list.txt'
-    python_command = './bin/python -u '
+    python_command = 'python -u '
+    if os.path.exists("./bin/python"):
+        python_command = './bin/python -u '
     pidfile_filename = './RUNNING'
     log_filename = './log.txt'
     if "PIPEX_DATA" not in os.environ:

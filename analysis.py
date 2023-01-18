@@ -245,7 +245,7 @@ def fill_surface_html_template(markers, df_norm):
                 if df_cell.empty:
                     z_row.append(0)
                 else:
-                    z_row.append(df_cell.iloc[0][markers[m]])
+                    z_row.append(df_cell[markers[m]].max())
             z[m].append(z_row)
     z_formatted = "["
     for z_marker in z:
