@@ -200,11 +200,13 @@ def data_calculations():
     plt.close()
    
     df_ext.to_csv(data_folder + '/analysis/downstream/cell_data_markers.csv', index=False)
+    print(">>> Markers information calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
     
     del df_corr
     del df_ext
 
     fill_surface_html_template(markers, df_norm)
+    print(">>> Markers surface plot generated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
     return df_norm, markers
 
