@@ -76,7 +76,7 @@ if __name__ =='__main__':
         np.save(data_folder + '/analysis/segmentation_data_filtered.npy', labels)
         print(">>> Filtered segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
     
-        imsave(data_folder + "/analysis/segmentation_filtered_mask.tiff", np.uint8(labels * 255))
+        imsave(data_folder + "/analysis/segmentation_filtered_mask.tiff", np.uint16(labels * 65535))
         print(">>> Filtered segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)  
         
     if (tile_size > 0): 
@@ -115,7 +115,7 @@ if __name__ =='__main__':
                 np.save(data_folder + '/analysis/segmentation_data_filtered_tile_' + tile_desc + '.npy', tile)
                 print(">>> Filtered segmentation tile ",tile_desc," result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
     
-                imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_mask.tiff", np.uint8(tile * 255))
+                imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_mask.tiff", np.uint16(tile * 65535))
                 print(">>> Filtered segmentation tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)  
                 
            
