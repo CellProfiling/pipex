@@ -24,7 +24,7 @@ from skimage.transform import resize
 
 
 PIL.Image.MAX_IMAGE_PIXELS = 10000000000
-pipex_max_resolution = 20000
+pipex_max_resolution = 30000
 pipex_scale_factor = 0
 data_folder = os.environ.get('PIPEX_DATA')
 stardist_tile_threshold = 4096
@@ -35,6 +35,8 @@ nuclei_marker = ""
 nuclei_diameter = 0
 nuclei_expansion = 0
 nuclei_definition = 0
+nuclei_closeness = 0
+nuclei_area_limit = 0
 membrane_marker = ""
 membrane_diameter = 0
 membrane_compactness = 0.9
@@ -130,10 +132,16 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     _ = None
     #for big images (>stardist_tile_threshold), run predict_instances_big method using 2048 square tiles
     if max(len(nuclei_img), len(nuclei_img[0])) > stardist_tile_threshold:
-        sdLabels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None))
+        sdLabels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
     else:
-        sdLabels, _ = model.predict_instances(nuclei_img,axes='YX',prob_thresh=(nuclei_definition if nuclei_definition > 0 else None))
+        sdLabels, _ = model.predict_instances(nuclei_img,axes='YX',prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
     print(">>> Stardist prediction done =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+
+    if nuclei_area_limit > 0:
+        detections = regionprops(sdLabels)
+        for curr_detection in detections:
+            if curr_detection.area > nuclei_area_limit:
+                sdLabels[sdLabels == curr_detection.label] = 0
 
     im = PIL.Image.fromarray((render_label(sdLabels, img=None) * 255).astype(np.uint8))
     im = im.convert('RGB')
@@ -151,6 +159,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 
     #if membrane marker is provided, run custom watershed segmentation
     if membrane_diameter > 0:
+        membrane_intensity_mean = threshold_multiotsu(membrane_img, 5)[0]
         tiles = []
         if len(membrane_img) > watershed_tile_threshold or len(membrane_img[0]) > watershed_tile_threshold:
             num_rows = int(len(membrane_img) / watershed_tile_size)
@@ -181,28 +190,32 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                 imsave(data_folder + "/analysis/quality_control/wathershed_tile_" + tile_desc + "_result.jpg", np.uint8(mark_boundaries(tile_orig, wsLabels) * 255))
                 print(">>> Watershed of tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
-
                 membrane_keep_index = -1
                 membrane_keep_intensity = 0
                 membrane_properties = {}
-                if membrane_keep == 'yes': 
-                    membrane_region_list = regionprops(wsLabels, tile_orig)
-                    membrane_intensity_max = tile_orig.max()
-                    for curr_membrane in membrane_region_list:
-                        membrane_properties[curr_membrane.label] = curr_membrane.intensity_mean
-                        if (curr_membrane.intensity_mean > membrane_intensity_max * 1 / 100):
-                            membrane_keep_intensity = membrane_keep_intensity + curr_membrane.intensity_mean
-                    membrane_keep_intensity = membrane_keep_intensity / len(membrane_region_list)
-                    
+                membrane_region_list = regionprops(wsLabels, tile_orig)
+                num_membrane_regions = 0
+                for curr_membrane in membrane_region_list:
+                    if curr_membrane.intensity_mean > membrane_intensity_mean:
+                        if membrane_keep == "yes":
+                            membrane_properties[curr_membrane.label] = curr_membrane.intensity_mean
+                            num_membrane_regions = num_membrane_regions + 1
+                    else:
+                        wsLabels[wsLabels == curr_membrane.label] = 0
+                if membrane_keep == "yes" and num_membrane_regions > 0:
+                    membrane_keep_intensity = membrane_intensity_mean
+
                 #merge resulting segments so they don't cut nuclei (not expanded)
                 wsRegions = {}
                 for row in range(len(wsLabels)):
                     for column in range(len(wsLabels[row])):
                         memLabel = wsLabels[row][column]
+                        if memLabel == 0:
+                            continue
                         if not memLabel in wsRegions:
                             wsRegions[memLabel] = set()
                         nucLabel = sdLabels[row + tile_x][column + tile_y]
-                        if nucLabel != 0: 
+                        if nucLabel != 0:
                             if not nucLabel in wsRegions[memLabel]:
                                 wsRegions[memLabel].add(nucLabel)
                         elif membrane_keep == 'yes' and memLabel in membrane_properties:
@@ -225,19 +238,23 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                         wsRegionsMerged[region] = region
         
                 for row in range(len(wsLabels)):
-                    for column in range(len(wsLabels[row])):      
+                    for column in range(len(wsLabels[row])):
+                        if wsLabels[row][column] == 0:
+                            continue
                         wsLabels[row][column] = wsRegionsMerged[wsLabels[row][column]]
             
                 imsave(data_folder + "/analysis/quality_control/wathershed_tile_" + tile_desc +"_result_merged_by_nuclei.jpg", np.uint8(mark_boundaries(tile_orig, wsLabels) * 255))
                 print(">>> Watershed of tile ",tile_desc," preliminary nuclei filter result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
-        
+
                 #cut expanded nuclei that collide with watershed segments
                 for row in range(len(wsLabels)):
-                    for column in range(len(wsLabels[row])):        
+                    for column in range(len(wsLabels[row])):
                         nucLabel = sdLabels[row + tile_x][column + tile_y]
                         expLabel = sdLabelsExpanded[row + tile_x][column + tile_y]
                         if nucLabel != expLabel or expLabel == 0:
                             memLabel = wsLabels[row][column]
+                            if memLabel == 0:
+                                continue
                             if len(wsRegions[memLabel]) == 0:
                                 sdLabelsExpanded[row + tile_x][column + tile_y] = 0
                             elif expLabel == 0 or not expLabel in wsRegions[memLabel]:
@@ -245,8 +262,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                                     membrane_only_label = 0 + sum(number for number in wsRegions[memLabel] if number < 0)
                                     sdLabelsExpanded[row + tile_x][column + tile_y] = membrane_only_label
                                 else:
-                                    sdLabelsExpanded[row + tile_x][column + tile_y] = 0            
-                                                
+                                    sdLabelsExpanded[row + tile_x][column + tile_y] = 0
                     
         #find rare disjointed segmented cells and using their associated convex hull instead
         segmentProperties = regionprops(sdLabelsExpanded)
@@ -299,12 +315,12 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
 #Function to handle the command line parameters passed
 def options(argv):
     if (len(argv) == 0):
-       print('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
+       print('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print ('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
+                print ('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
@@ -321,6 +337,12 @@ def options(argv):
             elif arg.startswith('-nuclei_definition='):
                 global nuclei_definition
                 nuclei_definition = float(arg[19:])
+            elif arg.startswith('-nuclei_closeness='):
+                global nuclei_closeness
+                nuclei_closeness = float(arg[18:])
+            elif arg.startswith('-nuclei_area_limit='):
+                global nuclei_area_limit
+                nuclei_area_limit = float(arg[19:])
             elif arg.startswith('-membrane_marker='):
                 global membrane_marker
                 membrane_marker = arg[17:]
