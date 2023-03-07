@@ -21,10 +21,11 @@ from skimage.filters import threshold_multiotsu
 from skimage.measure import regionprops
 from skimage.segmentation import watershed, mark_boundaries, expand_labels
 from skimage.transform import resize
+import gc
 
 
 PIL.Image.MAX_IMAGE_PIXELS = 10000000000
-pipex_max_resolution = 30000
+pipex_max_resolution = 20000
 pipex_scale_factor = 0
 data_folder = os.environ.get('PIPEX_DATA')
 stardist_tile_threshold = 4096
@@ -67,9 +68,9 @@ def downscale_images(np_img):
 
 def upscale_results(df):    
     if (pipex_scale_factor > 0):
-        image = PIL.Image.open(data_folder + "/analysis/segmentation_mask.tiff")
+        image = PIL.Image.open(data_folder + "/analysis/segmentation_binary_mask.tiff")
         image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
-        image.save(data_folder + "/analysis/segmentation_mask.tiff")        
+        image.save(data_folder + "/analysis/segmentation_binary_mask.tiff")
         
         image = PIL.Image.open(data_folder + "/analysis/segmentation_mask_show.jpg")
         image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
@@ -159,6 +160,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 
     #if membrane marker is provided, run custom watershed segmentation
     if membrane_diameter > 0:
+        membrane_keep_index = -1
         membrane_intensity_mean = threshold_multiotsu(membrane_img, 5)[0]
         tiles = []
         if len(membrane_img) > watershed_tile_threshold or len(membrane_img[0]) > watershed_tile_threshold:
@@ -190,7 +192,6 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                 imsave(data_folder + "/analysis/quality_control/wathershed_tile_" + tile_desc + "_result.jpg", np.uint8(mark_boundaries(tile_orig, wsLabels) * 255))
                 print(">>> Watershed of tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
-                membrane_keep_index = -1
                 membrane_keep_intensity = 0
                 membrane_properties = {}
                 membrane_region_list = regionprops(wsLabels, tile_orig)
@@ -263,7 +264,11 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                                     sdLabelsExpanded[row + tile_x][column + tile_y] = membrane_only_label
                                 else:
                                     sdLabelsExpanded[row + tile_x][column + tile_y] = 0
-                    
+
+        top_positive_label = np.max(sdLabelsExpanded)
+        negative_label_mask = sdLabelsExpanded < 0
+        sdLabelsExpanded[negative_label_mask] = top_positive_label - sdLabelsExpanded[negative_label_mask]
+
         #find rare disjointed segmented cells and using their associated convex hull instead
         segmentProperties = regionprops(sdLabelsExpanded)
         for segment in segmentProperties:
@@ -272,25 +277,30 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                 print(">>> Found disjointed segment " + str(segment.label) + ", using convex hull instead =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
                 bbox = segment.bbox
                 filling_image = segment.image_convex
-                for row in range(len(filling_image)):
-                    for column in range(len(filling_image[row])):
-                       filled_pixel = filling_image[row][column]
-                       if (filled_pixel > 0):
-                           sdLabelsExpanded[row + bbox[0] - 1][column + bbox[1] - 1] = segment.label
+                if segment.solidity > 0.0:
+                    for row in range(len(filling_image)):
+                        for column in range(len(filling_image[row])):
+                           filled_pixel = filling_image[row][column]
+                           if (filled_pixel > 0):
+                               sdLabelsExpanded[row + bbox[0] - 1][column + bbox[1] - 1] = segment.label
 
     else:
         del sdLabels
-        
+
     np.save(data_folder + '/analysis/segmentation_data.npy', sdLabelsExpanded)
     print(">>> Final joined segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
-    
-    imsave(data_folder + "/analysis/segmentation_mask.tiff", np.uint16(sdLabelsExpanded * 65535))
-    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
     imsave(data_folder + "/analysis/segmentation_mask_show.jpg", np.uint8(mark_boundaries(nuclei_img_orig, sdLabelsExpanded) * 255))
     print(">>> Final joined segmentation result image over nuclei saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
+    sdLabelsExpandedBinary = np.copy(sdLabelsExpanded)
+    sdLabelsExpandedBinary[sdLabelsExpandedBinary > 0] = 1
+    imsave(data_folder + "/analysis/segmentation_binary_mask.tiff", np.uint16(sdLabelsExpandedBinary * 65535))
+    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    del sdLabelsExpandedBinary
+
     return sdLabelsExpanded
+
 
 #Function to calculate the marker intensities for each cell
 def marker_calculation(marker, marker_img, cellLabels, data_table):
@@ -361,8 +371,7 @@ def options(argv):
             elif arg.startswith('-measure_markers='):
                 global measure_markers
                 measure_markers = arg[17:].split(",")
-           
-           
+
 
 if __name__ =='__main__':
     options(sys.argv[1:])
@@ -447,7 +456,7 @@ if __name__ =='__main__':
         data_cell['y'] = int(cell.centroid[0])
         data_table[cell.label] = data_cell
 
-    #calculating marker intensities per cell    
+    #calculating marker intensities per cell
     for file in os.listdir(data_folder):
         file_path = data_folder + '/' + file
         if os.path.isdir(file_path):

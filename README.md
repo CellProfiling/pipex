@@ -98,6 +98,8 @@ There are currently available the following commands:
   - `-nuclei_diameter=<number of pixels>` : example -> -nuclei_diameter=20. **OBS**: this is an approximate guideline, Stardist is smart enough to adapt around 50% above and below.
   - `-nuclei_expansion=<number of pixels, can be 0>` : example -> -nuclei_expansion=20. **OBS**: the algorithm is smart enough to not overlap the expansions
   - `-nuclei_definition=<optional, gradation between 0.001 and 0.999>` : example -> -nuclei_definition=0.5. **OBS**: this instructs to Stardist algorithm to be less or more strict in its detections. Leave it empty or at 0 for default Stardist model value. Also, if you are using big images and PIPEX is downscaling them, use a low value (i.e 0.1) to help Stardist work better with smaller nuclei.
+  - `-nuclei_closeness=<optional, gradation between 0.001 and 0.999>` : example -> -nuclei_closeness=0.5. **OBS**: this instructs to Stardist algorithm to allow less or more close (even overlaping at high values) detections. Leave it empty or at 0 for default Stardist model value.
+  - `-nuclei_area_limit=<optional, number of surface pixels>` : example -> -nuclei_area_limit=1600. **OBS**: this will remove any Stardist nuclei detections with a pixel area larger than the value indicated (and this is done BEFORE nuclei expansion AND membrane watershed). This can be useful to remove wrongly spot detections and/or to let the membrane segmentation kick in with the parameter -membrane_keep.
   - `-membrane_marker=<optional, name before . in image file>` : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1. **OBS**: if you don't use membrane marker you will obtain a basic Stardist segmentation with the specified nuclei expansion
   - `-membrane_diameter=<optional, number of pixels>` : example -> -membrane_diameter=25. **OBS**: required if membrane marker is used, this is an approximate guideline, the custom watershed segmentation is smart enough to adapt.
   - `-membrane_compactness=<optional, "squareness" of the membrane, gradation between 0.001 and 0.999>` : example -> -membrane_compactness=0.5. **OBS**: required if membrane marker is used, this instructs the watershed algorithm to try to keep a more or less (bigger value is more) square-type segmentation.
@@ -180,7 +182,7 @@ This will generate the following sub-folders and items inside the data folder:
   - `segmentation_data.npy` file: the labelled cell regions in numpy array format (for further computing analysis)
   - `segmentation_data_filtered.npy` file: the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step)
   - `segmentation_data_filtered_tile_X_X.npy` file: each tile of the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step with tiling)
-  - `segmentation_mask.tiff` file: the cell segmentation mask in TIFF format.
+  - `segmentation_binary_mask.tiff` file: the cell segmentation binary mask in TIFF format.
   - `segmentation_mask_filtered.tiff` file: the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks)
   - `segmentation_mask_filtered_tile_X_X.tiff` file: each tile of the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks step with tiling)
   - `segmentation_mask_show.jpg` file: the cell segmentation mask over the first image (usually DAPI) in JPG format.

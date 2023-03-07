@@ -529,7 +529,7 @@ def options(argv):
                 cellsize_max = int(arg[14:]) / 100.0
             elif arg.startswith('-cellsize_min='):
                 global cellsize_min
-                cellsize_min = (int(arg[14:]) - 1) / 100.0
+                cellsize_min = int(arg[14:]) / 100.0
             elif arg.startswith('-custom_filter='):
                 global custom_filter
                 custom_filter = arg[15:]

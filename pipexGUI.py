@@ -65,6 +65,8 @@ tooltip_39 = '<optional, yes or no to apply 0 to 1 re-scale normalization>: \nex
 tooltip_40 = '<optional, yes or no to use binarized columns for clustering>: \nexample -> no'
 tooltip_41 = '<optional, list of present specific markers to inlcude>: \nexample -> AMY2A,SST,GORASP2'
 tooltip_42 = '<optional, name of the column to add as cluster color information from cell_data.csv>: \nexample -> kmeans_color'
+tooltip_43 = '<optional, "strictness" of stardist detections proximity, gradation between 0.001 and 0.999>: \nexample -> 0.5'
+tooltip_44 = '<optional, maximum allowed pixel area for initial Stardist detections>: \nexample -> 1600'
      
 sg.theme('LightBrown10')
 
@@ -88,6 +90,8 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - NUCLEI diameter:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='20',s=20,disabled=True, key='-SEGMENTATION_NUCDIAM-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_2)],
           [sg.Text('  - NUCLEI expansion:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='20',s=20,disabled=True, key='-SEGMENTATION_NUCEXPA-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_3)],
           [sg.Text('  - NUCLEI definition:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-SEGMENTATION_NUCDEFI-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_23)],
+          [sg.Text('  - NUCLEI closeness:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-SEGMENTATION_NUCCLOS-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_43)],
+          [sg.Text('  - NUCLEI area limit:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-SEGMENTATION_NUCARLI-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_44)],
           [sg.Text('  - Use membrane marker', pad=((20,0), (0,0))), sg.Checkbox('',key='-SEGMENTATION_MEMUSE-', disabled=True, enable_events=True)],
           [sg.Text('  - MEMBRANE marker:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='HSP90B1',s=20,disabled=True, key='-SEGMENTATION_MEMMARK-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_4)],
           [sg.Text('  - MEMBRANE diameter:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='25',s=20,disabled=True, key='-SEGMENTATION_MEMDIAM-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_5)],
@@ -179,6 +183,8 @@ while True:
         window['-SEGMENTATION_NUCDIAM-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_NUCEXPA-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_NUCDEFI-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_NUCCLOS-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_NUCARLI-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMUSE-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMMARK-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION-']))
@@ -288,6 +294,8 @@ if values['-SEGMENTATION-']:
         ' -nuclei_diameter=' + values['-SEGMENTATION_NUCDIAM-'] +
         ' -nuclei_expansion=' + values['-SEGMENTATION_NUCEXPA-'] +
         ' -nuclei_definition=' + values['-SEGMENTATION_NUCDEFI-'] +
+        ' -nuclei_closeness=' + values['-SEGMENTATION_NUCCLOS-'] +
+        ' -nuclei_area_limit=' + values['-SEGMENTATION_NUCARLI-'] +
         ' -adjust_images=' + ('yes' if values['-SEGMENTATION_ADJUST-'] else 'no'))
     if (values['-SEGMENTATION_MEMUSE-']):       
         batch_list = (batch_list +  
