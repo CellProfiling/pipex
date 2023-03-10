@@ -19,13 +19,12 @@ from skimage.io import imsave, imread
 from skimage.exposure import is_low_contrast, equalize_adapthist
 from skimage.filters import threshold_multiotsu
 from skimage.measure import regionprops
-from skimage.segmentation import watershed, mark_boundaries, expand_labels
+from skimage.segmentation import watershed, mark_boundaries, expand_labels, relabel_sequential
 from skimage.transform import resize
-import gc
 
 
 PIL.Image.MAX_IMAGE_PIXELS = 10000000000
-pipex_max_resolution = 20000
+pipex_max_resolution = 30000
 pipex_scale_factor = 0
 data_folder = os.environ.get('PIPEX_DATA')
 stardist_tile_threshold = 4096
@@ -68,9 +67,9 @@ def downscale_images(np_img):
 
 def upscale_results(df):    
     if (pipex_scale_factor > 0):
-        image = PIL.Image.open(data_folder + "/analysis/segmentation_binary_mask.tiff")
+        image = PIL.Image.open(data_folder + "/analysis/segmentation_binary_mask.tif")
         image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
-        image.save(data_folder + "/analysis/segmentation_binary_mask.tiff")
+        image.save(data_folder + "/analysis/segmentation_binary_mask.tif")
         
         image = PIL.Image.open(data_folder + "/analysis/segmentation_mask_show.jpg")
         image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
@@ -287,6 +286,8 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     else:
         del sdLabels
 
+    sdLabelsExpanded = relabel_sequential(sdLabelsExpanded)[0]
+
     np.save(data_folder + '/analysis/segmentation_data.npy', sdLabelsExpanded)
     print(">>> Final joined segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
@@ -295,9 +296,12 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 
     sdLabelsExpandedBinary = np.copy(sdLabelsExpanded)
     sdLabelsExpandedBinary[sdLabelsExpandedBinary > 0] = 1
-    imsave(data_folder + "/analysis/segmentation_binary_mask.tiff", np.uint16(sdLabelsExpandedBinary * 65535))
+    imsave(data_folder + "/analysis/segmentation_binary_mask.tif", np.uint16(sdLabelsExpandedBinary * 65535))
     print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
     del sdLabelsExpandedBinary
+
+    if (np.amax(sdLabelsExpanded) <= 65535):
+        imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint16(sdLabelsExpanded * 65535))
 
     return sdLabelsExpanded
 

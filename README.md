@@ -137,6 +137,7 @@ There are currently available the following commands:
   - `-tile_size=<optional, number of pixels of each square tile segmented>` : example -> -tile_size=2048. **OBS**: the tiles will always have a square shape (but see `-extend` option)
   - `-tile_overlap=<optional, number of pixels of surrounding overlap of each square tile segmented>` : example -> -tile_overlap=128. **OBS**: this is a fix pixel size option as oposed as `-tile_percentage`
   - `-tile_percentage_overlap=<optional, tile size\'s percentage of surrounding overlap of each square tile segmented>` : example -> -tile_percentage_overlap=10. **OBS**: this is a pixel percentage size option as oposed as `-tile_overlap`
+  - `-tile_relabel=<yes or no to relabel sequentially the tile segments>` : example -> -tile_relabel=no. **OBS**: special option to have the segments of each tile relabeled sequentially, which may be useful to have possible unique identifiers per tile
   - `-extend_tile=<yes or no to have bigger border tiles>` : example -> -extend_tile=no. **OBS**: special option to have the last right and bottom border tile of the image extended to reach their limit if the image length and width does not match an exact tile size multiplier
   
 - `preprocessing.py` : [BETA] preprocesses the images to try to fix common microscope acquisition problems. It can remove lower and/or upper intensities (background and/or artifacts), increase the exposure and/or generate a heat map. If the image suffers from severe tiling, preprocessing can try to help in different ways: reducing light gradients in each tile, homogenize the intensities of all the tiles and/or smooth the tile cuts. [NOTE] if more than one image is provided in the data folder, preprocessing will calculate all transforming operations in the first file and apply them equally in the rest of them; this is useful to modify proportionally all markers/channels present in the same original microscope image, which will most probably suffer of the same light/intensity problems.
@@ -182,9 +183,9 @@ This will generate the following sub-folders and items inside the data folder:
   - `segmentation_data.npy` file: the labelled cell regions in numpy array format (for further computing analysis)
   - `segmentation_data_filtered.npy` file: the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step)
   - `segmentation_data_filtered_tile_X_X.npy` file: each tile of the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step with tiling)
-  - `segmentation_binary_mask.tiff` file: the cell segmentation binary mask in TIFF format.
-  - `segmentation_mask_filtered.tiff` file: the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks)
-  - `segmentation_mask_filtered_tile_X_X.tiff` file: each tile of the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks step with tiling)
+  - `segmentation_binary_mask.tif` file: the cell segmentation binary mask in TIFF format.
+  - `segmentation_mask_filtered.tif` file: the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks)
+  - `segmentation_mask_filtered_tile_X_X.tif` file: each tile of the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks step with tiling)
   - `segmentation_mask_show.jpg` file: the cell segmentation mask over the first image (usually DAPI) in JPG format.
   - `cell_data.csv` file: the Flow Cytometry Standard file (as CSV) with cell segmentation metadata and all markers intensities calculated (and clustering if analysis command has been performed).
   - `cell_segmentation_geo.json` file: the GEOjson file that can be imported in QuPath as cell segmentation (and clustering if analysis command has been performed). **OBS** this file will only be present if you have run the generate_geojson command)

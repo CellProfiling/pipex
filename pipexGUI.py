@@ -67,6 +67,7 @@ tooltip_41 = '<optional, list of present specific markers to inlcude>: \nexample
 tooltip_42 = '<optional, name of the column to add as cluster color information from cell_data.csv>: \nexample -> kmeans_color'
 tooltip_43 = '<optional, "strictness" of stardist detections proximity, gradation between 0.001 and 0.999>: \nexample -> 0.5'
 tooltip_44 = '<optional, maximum allowed pixel area for initial Stardist detections>: \nexample -> 1600'
+tooltip_45 = '<optional, yes or no to relabel sequentially the tile segments>: \nexample -> yes'
      
 sg.theme('LightBrown10')
 
@@ -134,6 +135,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Tile size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='2048',s=20,disabled=True, key='-FILTERED_TILSIZ-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_13)],
           [sg.Text('  - Tile overlap, in pixels:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-FILTERED_TILOVE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_14)],
           [sg.Text('  - Tile overlap, in percentage:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-FILTERED_TILPER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_15)],
+          [sg.Text('  - Tile relabel:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-FILTERED_TILLAB-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_45)],
           [sg.Text('  - Extend tiles:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-FILTERED_TILEXT-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_16)]]
 
 layout = [[sg.Column(column, scrollable=True,  vertical_scroll_only=True, size=(620,700))],
@@ -235,6 +237,7 @@ while True:
         window['-FILTERED_TILSIZ-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_TILOVE-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_TILPER-'].update(disabled=(not values['-FILTERED-']))
+        window['-FILTERED_TILLAB-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_TILEXT-'].update(disabled=(not values['-FILTERED-']))
         if (values['-FILTERED-']):
             window['-FILTERED_FIELD-'].update(disabled=(not values['-FILTERED_CLUFIL-']))
@@ -242,6 +245,7 @@ while True:
             window['-FILTERED_TILSIZ-'].update(disabled=(not values['-FILTERED_TILING-']))
             window['-FILTERED_TILOVE-'].update(disabled=(not values['-FILTERED_TILING-']))
             window['-FILTERED_TILPER-'].update(disabled=(not values['-FILTERED_TILING-']))
+            window['-FILTERED_TILLAB-'].update(disabled=(not values['-FILTERED_TILING-']))
             window['-FILTERED_TILEXT-'].update(disabled=(not values['-FILTERED_TILING-']))
     if event == '-FILTERED_CLUFIL-':
         window['-FILTERED_FIELD-'].update(disabled=(not values['-FILTERED_CLUFIL-']))
@@ -250,6 +254,7 @@ while True:
         window['-FILTERED_TILSIZ-'].update(disabled=(not values['-FILTERED_TILING-']))
         window['-FILTERED_TILOVE-'].update(disabled=(not values['-FILTERED_TILING-']))
         window['-FILTERED_TILPER-'].update(disabled=(not values['-FILTERED_TILING-']))
+        window['-FILTERED_TILLAB-'].update(disabled=(not values['-FILTERED_TILING-']))
         window['-FILTERED_TILEXT-'].update(disabled=(not values['-FILTERED_TILING-']))
         
 window.close()
@@ -356,6 +361,7 @@ if values['-FILTERED-']:
             ' -tile_size=' + values['-FILTERED_TILSIZ-'] +
             ' -tile_overlap=' + values['-FILTERED_TILOVE-'] +
             ' -tile_percentage_overlap=' + values['-FILTERED_TILPER-'] +
+            ' -tile_relabel=' + ('yes' if values['-FILTERED_TILLAB-'] else 'no') +
             ' -extend_tile=' + ('yes' if values['-FILTERED_TILEXT-'] else 'no'))
 
 if (batch_list != ''):
