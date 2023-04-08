@@ -68,6 +68,7 @@ tooltip_42 = '<optional, name of the column to add as cluster color information 
 tooltip_43 = '<optional, "strictness" of stardist detections proximity, gradation between 0.001 and 0.999>: \nexample -> 0.5'
 tooltip_44 = '<optional, maximum allowed pixel area for initial Stardist detections>: \nexample -> 1600'
 tooltip_45 = '<optional, yes or no to relabel sequentially the tile segments>: \nexample -> yes'
+tooltip_46 = '<optional, file path to a pre-made custom segmentation>`: \nexample -> -custom_segmentation=/data/custom_seg.npy'
      
 sg.theme('LightBrown10')
 
@@ -99,6 +100,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - MEMBRANE compactness:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0.9',s=20,disabled=True, key='-SEGMENTATION_MEMCOMP-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_6)],
           [sg.Text('  - Keep membrane without nuclei:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-SEGMENTATION_MEMKEEP-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_33)],
           [sg.Text('  - Adjust images:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-SEGMENTATION_ADJUST-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_7)],
+          [sg.Text('  - Custom segmentation:', s=35, pad=((20,0), (0,0))), sg.In(default_text="", size=(30,1), key='-SEGMENTATION_CUSSEG-'), sg.FileBrowse(initial_folder=data_folder), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_46)],
           [sg.Text('  - Measure markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='GORASP2,AMY2A',s=40,disabled=True, key='-SEGMENTATION_MEASURE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_8)],
           [sg.Text('_'*85)],
           [sg.Checkbox('Downstream analysis', font='any 12 bold', key='-ANALYSIS-', enable_events=True)],
@@ -193,6 +195,7 @@ while True:
         window['-SEGMENTATION_MEMCOMP-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMKEEP-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_ADJUST-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_CUSSEG-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEASURE-'].update(disabled=(not values['-SEGMENTATION-']))
         if (values['-SEGMENTATION-']):
             window['-SEGMENTATION_MEMMARK-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
@@ -271,9 +274,11 @@ if batch_mode:
 
 batch_filename = './pipex_batch_list.txt'
 batch_data = values['-DATA_FOLDER-']
+custom_segmentation_file = values['-SEGMENTATION_CUSSEG-']
 if "PIPEX_WORK" in os.environ:
     batch_filename = os.environ['PIPEX_WORK'] + '/pipex_batch_list.txt'
     batch_data = batch_data.replace(os.environ['PIPEX_WORK'], './work')
+    custom_segmentation_file = custom_segmentation_file.replace(os.environ['PIPEX_WORK'], './work')
         
 batch_list = ''
 if values['-PREPROCESS-']:
@@ -308,6 +313,9 @@ if values['-SEGMENTATION-']:
             ' -membrane_diameter=' + values['-SEGMENTATION_MEMDIAM-'] +
             ' -membrane_compactness=' + values['-SEGMENTATION_MEMCOMP-'] +
             ' -membrane_keep=' + ('yes' if values['-SEGMENTATION_MEMKEEP-'] else 'no'))
+    if (values['-SEGMENTATION_CUSSEG-'] != ''):
+        batch_list = (batch_list +
+            ' -custom_segmentation=' + custom_segmentation_file)
     if (values['-SEGMENTATION_MEASURE-'] != ''):     
         batch_list = (batch_list +  
             ' -measure_markers=' + values['-SEGMENTATION_MEASURE-'])

@@ -105,6 +105,7 @@ There are currently available the following commands:
   - `-membrane_compactness=<optional, "squareness" of the membrane, gradation between 0.001 and 0.999>` : example -> -membrane_compactness=0.5. **OBS**: required if membrane marker is used, this instructs the watershed algorithm to try to keep a more or less (bigger value is more) square-type segmentation.
   - `-membrane_keep=<yes or no to keep segmented membranes without nuclei>` : example -> -membrane_keep=no. **OBS**: this will keep detected membrane segmentations without an underlying nuclei; useful for nuclei shapes not properly segmented by Stardist
   - `-adjust_images=<yes or no to enhance poor images>` : example -> -adjust_images=yes. **OBS**: this preprocess nuclei (and membrane if selected) images with poor contrast and/or intensity levels. Does not modify the original images and you can see the altered ones in the `quality\_control` sub-folder
+  - `-custom_segmentation=<optional, file path to a pre-made custom segmentation>` : example -> -custom_segmentation=/data/custom_seg.npy. **OBS**: accepts segmentations in numpy array or image mask file formats. This ignores all the previous segmentation parameters, using this custom segmentation for measuring the markers. Understand that many generated output files will not exists
   - `-measure_markers=<list of markers names before . in image files>` : example -> measure_markers=DAPI,CDH1,AMY2A,SST,GORASP2.
 
 - `analysis.py` : performs PIPEX broad scope analysis. MUST be run AFTER a segmentation. Uses the following parameters:

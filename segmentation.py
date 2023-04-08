@@ -28,8 +28,8 @@ pipex_max_resolution = 30000
 pipex_scale_factor = 0
 data_folder = os.environ.get('PIPEX_DATA')
 stardist_tile_threshold = 4096
-watershed_tile_threshold = 2048
-watershed_tile_size = 2048
+watershed_tile_threshold = 8192
+watershed_tile_size = 8192
 
 nuclei_marker = ""
 nuclei_diameter = 0
@@ -42,6 +42,7 @@ membrane_diameter = 0
 membrane_compactness = 0.9
 membrane_keep = "no"
 adjust_images = 0
+custom_segmentation = ""
 measure_markers = ""
        
        
@@ -329,12 +330,12 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
 #Function to handle the command line parameters passed
 def options(argv):
     if (len(argv) == 0):
-       print('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
+       print('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-custom_segmentation=<optional, file path to a pre-made custom segmentation> : example -> -custom_segmentation=/data/custom_seg.npy\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print ('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
+                print ('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-adjust_images=<yes or no to enhance poor images> : example -> -adjust_images=yes\n\t-custom_segmentation=<optional, file path to a pre-made custom segmentation> : example -> -custom_segmentation=/data/custom_seg.npy\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
@@ -372,6 +373,9 @@ def options(argv):
             elif arg.startswith('-adjust_images='):
                 global adjust_images
                 adjust_images = arg[15:]
+            elif arg.startswith('-custom_segmentation='):
+                global custom_segmentation
+                custom_segmentation = arg[21:]
             elif arg.startswith('-measure_markers='):
                 global measure_markers
                 measure_markers = arg[17:].split(",")
@@ -396,58 +400,74 @@ if __name__ =='__main__':
         os.mkdir(data_folder + '/analysis/quality_control') 
     except OSError as error: 
         print('>>> quality_control folder already exists, overwriting results', flush=True)  
-    
+
     #finding nuclei and membrane image filenames by marker name
     nuclei_img = None
     membrane_img = None
-    for file in os.listdir(data_folder):
-        file_path = data_folder + '/' + file
-        if os.path.isdir(file_path):
-            continue
+    if custom_segmentation == "":
+        for file in os.listdir(data_folder):
+            file_path = data_folder + '/' + file
+            if os.path.isdir(file_path):
+                continue
 
-        next_try = False        
-        try:
-            with TiffFile(file_path) as tif:
-                if len(tif.series[0].pages) == 1:
-                    if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                        nuclei_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
-                    if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                        membrane_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
-                else:
-                    for page in tif.series[0].pages:
-                        biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
-                        if biomarker == nuclei_marker:
-                            nuclei_img = downscale_images(page.asarray())
-                        if biomarker == membrane_marker:
-                            membrane_img = downscale_images(page.asarray())
-        except Exception as e:
-            print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
-            print('>>> ', e, flush=True)
-            next_try = True
-                
-        if next_try:
             next_try = False
             try:
-                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                    nuclei_img = downscale_images(imread(file_path))
-                if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                    membrane_img = downscale_images(imread(file_path))
+                with TiffFile(file_path) as tif:
+                    if len(tif.series[0].pages) == 1:
+                        if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                            nuclei_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
+                        if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                            membrane_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
+                    else:
+                        for page in tif.series[0].pages:
+                            biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
+                            if biomarker == nuclei_marker:
+                                nuclei_img = downscale_images(page.asarray())
+                            if biomarker == membrane_marker:
+                                membrane_img = downscale_images(page.asarray())
             except Exception as e:
+                print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
+                print('>>> ', e, flush=True)
                 next_try = True
-                print('>>> ', e, flush=True)
 
-        if next_try:
+            if next_try:
+                next_try = False
+                try:
+                    if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                        nuclei_img = downscale_images(imread(file_path))
+                    if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                        membrane_img = downscale_images(imread(file_path))
+                except Exception as e:
+                    next_try = True
+                    print('>>> ', e, flush=True)
+
+            if next_try:
+                try:
+                    if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
+                        nuclei_img = downscale_images(np.array(PIL.Image.open(file_path)))
+                    if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
+                        membrane_img = downscale_images(np.array(PIL.Image.open(file_path)))
+                except Exception as e:
+                    print('>>> Could not read image ' + file_path, flush=True)
+                    print('>>> ', e, flush=True)
+
+        #performing segmentation
+        cellLabels = cell_segmentation(nuclei_img, membrane_img)
+    else:
+        try_image = False
+        label_data = None
+        try:
+            cellLabels = downscale_images(np.load(custom_segmentation))
+        except Exception as e:
+            try_image = True
+            print('>>> ', e, flush=True)
+
+        if try_image:
             try:
-                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                    nuclei_img = downscale_images(np.array(PIL.Image.open(file_path)))
-                if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                    membrane_img = downscale_images(np.array(PIL.Image.open(file_path)))
+                cellLabels = downscale_images(np.array(PIL.Image.open(custom_segmentation)))
             except Exception as e:
-                print('>>> Could not read image ' + file_path, flush=True)
+                print('>>> Could not custom segmentation file ' + custom_segmentation, flush=True)
                 print('>>> ', e, flush=True)
-        
-    #performing segmentation    
-    cellLabels = cell_segmentation(nuclei_img, membrane_img)
 
     #creating data table with segmented cell information
     cellProperties = regionprops(cellLabels)
