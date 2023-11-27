@@ -124,6 +124,8 @@ There are currently available the following commands:
   - `-kmeans=<optional, yes or no to perform kmeans clustering>` : example -> -kmeans=yes. **OBS**: this will perform a kmeans clustering and all its associated data and plots.
   - `-elbow=<optional, yes or no to show elbow analysis for kmeans>` : example -> -elbow=yes. **OBS**: if kmeans is activated, this will perform a series of 20 kmeans clustering to display the resulting distortion and inertia plots.
   - `-k_clusters=<optional, force k number of cluster in kmeans>` : example -> -k_clusters=10. **OBS**: if kmeans is activated, this will use the specified number of k clusters. The default is 10.
+  - `-refine_clusters=<optional, yes or no to refine cluster results>` : example -> -refine_clusters=yes. **OBS**: this will perform a cluster refinement over leiden and/or kmeans unsupervised results based on the rules described in [cell_types.csv] 
+  - `-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on>` : example -> -neigh_cluster_id=kmeans_ref. **OBS**: this will perform a neighborhood analysis based on the specified calculated cluster column
 
 - `generate_geojson.py` : generates a GEOjson file to be imported in QuPath. MUST be run AFTER a segmentation and optionally after an analysis (if you want the default clustering). Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder

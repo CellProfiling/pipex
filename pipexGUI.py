@@ -11,7 +11,7 @@ data_folder = os.path.abspath(os.environ.get('PIPEX_DATA'))
 pidfile_filename = './RUNNING'
 if "PIPEX_WORK" in os.environ:
     pidfile_filename = './work/RUNNING'
-        
+
 try:
     with open(pidfile_filename,'r') as f:
         lines = f.readlines()
@@ -20,9 +20,9 @@ try:
             sys.exit()
 except IOError:
     pass
-     
+
 info_icon = b'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAC8HpUWHRSYXcgcHJvZmlsZSB0eXBlIGV4aWYAAHja7ZddkuwmDIXfWUWWYEkIieXwW5UdZPk5GLdzu3vuQydPqWooAwb5IPQBPRPGX3/O8AcSZU8hqnnKKR1IMcfMBQ0/dipnSUc8yzPFawjvT/3hHmB0CWrZr54u+0c/3QK7KmjpL0LeroH6PJCvGdhfhHhXsjxa7X4J5UtIeA/QJVD2so6U3X5dQh277o+V+H7CKqI/u/32boheV8wjzENIDpQsvh2Q9XCQgobsEoYkEW2YomRJlxgC8lOc7pTh0RwXinejJyp3i37uD6+0Il8m8hLkdNc/9gfSlwG55+Gn/eNXi5/7TbZUOF6iv545u89zzVhFiQmhTteiHks5W7CrmGJN7QF66TA8Cgk7c0Z27OqGrdCPdlTkRpkYDCZF6lRo0jjrRg0uRh6BDQ3mxnJ2uhhnbrL5IdNkkyxdHBQbsAt6+faFzmnz0cI5m2PmTjBlghitffFpDp9+MOc6CkSH37GCX8wr2HBjkVslzECE5hVUPQP8yK9pcRUQ1BXldUQyAlu3RFX65yaQE7TAUFHvM0jWLwGECFMrnCEBAVAjUUp0GLMRIZAOQAWus0SuIECq3OEkR5EENs5ranxidJqyMroD+nGZgYRKEgObLAWwYlTsH4uOPVRUNKpqUlPXrCVJiklTSpbWpVhMLAZTS2bmlq24eHT15Obu2UvmLLg0Nads2XPOpWDOAuWCrwsMSqlcpcaqoaZq1WuupWH7tNi0pWbNW26lc5eO+6Onbt177mXQwFYacehIw4aPPMrEVpsSZpw607TpM89yU7uwvuUPqNFFjU9Sy9Buaug1e0jQuk50MQMwDpFA3BYCbGhezA6nGHmRW8yOzDgVynBSF7NOixgIxkGskx7sAm+ii9x/4hYsPnHjf0suLHQfknvn9hO1vn6G2klsn8IV1ENw+jA+vLCX9WP3VoffDXxaf4W+Ql+hr9BX6Cv0FfofCU388bD+C/wbJaGnjctq5JEAAA0aaVRYdFhNTDpjb20uYWRvYmUueG1wAAAAAAA8P3hwYWNrZXQgYmVnaW49Iu+7vyIgaWQ9Ilc1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCI/Pgo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIiB4OnhtcHRrPSJYTVAgQ29yZSA0LjQuMC1FeGl2MiI+CiA8cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPgogIDxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSIiCiAgICB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIKICAgIHhtbG5zOnN0RXZ0PSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VFdmVudCMiCiAgICB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iCiAgICB4bWxuczpHSU1QPSJodHRwOi8vd3d3LmdpbXAub3JnL3htcC8iCiAgICB4bWxuczp0aWZmPSJodHRwOi8vbnMuYWRvYmUuY29tL3RpZmYvMS4wLyIKICAgIHhtbG5zOnhtcD0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLyIKICAgeG1wTU06RG9jdW1lbnRJRD0iZ2ltcDpkb2NpZDpnaW1wOjZiYTJkMjY3LTViNmQtNGQ1MS1hMzI3LWE3YzY5MTdjZTQ4NCIKICAgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDo4ZDQ3YzcxYy04ZGU0LTRkYmQtODQ5MS00NDg0OGNjNGQwMDQiCiAgIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDozYzEwOWNjMS1mODI2LTRmNjMtYWY2YS00ZGUyYzViNjBkMDgiCiAgIGRjOkZvcm1hdD0iaW1hZ2UvcG5nIgogICBHSU1QOkFQST0iMi4wIgogICBHSU1QOlBsYXRmb3JtPSJMaW51eCIKICAgR0lNUDpUaW1lU3RhbXA9IjE2NDYzMTMwMjYwNTkwNjUiCiAgIEdJTVA6VmVyc2lvbj0iMi4xMC4yOCIKICAgdGlmZjpPcmllbnRhdGlvbj0iMSIKICAgeG1wOkNyZWF0b3JUb29sPSJHSU1QIDIuMTAiPgogICA8eG1wTU06SGlzdG9yeT4KICAgIDxyZGY6QmFnPgogICAgIDxyZGY6bGkKICAgICAgc3RFdnQ6YWN0aW9uPSJzYXZlZCIKICAgICAgc3RFdnQ6Y2hhbmdlZD0iLyIKICAgICAgc3RFdnQ6aW5zdGFuY2VJRD0ieG1wLmlpZDo5ZjBmMGVlOS1lNjhjLTRhZTMtYTY4Mi1lOTU2YmRkNjRmNTUiCiAgICAgIHN0RXZ0OnNvZnR3YXJlQWdlbnQ9IkdpbXAgMi4xMCAoTGludXgpIgogICAgICBzdEV2dDp3aGVuPSIyMDIyLTAzLTAzVDE0OjEwOjI2KzAxOjAwIi8+CiAgICA8L3JkZjpCYWc+CiAgIDwveG1wTU06SGlzdG9yeT4KICA8L3JkZjpEZXNjcmlwdGlvbj4KIDwvcmRmOlJERj4KPC94OnhtcG1ldGE+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAgICAgICAgICAgICAKPD94cGFja2V0IGVuZD0idyI/Pr5MA1AAAAGFaUNDUElDQyBwcm9maWxlAAAokX2RPUjDQBiG36aKP7Q42EHEIUJ1siAq4qhVKEKFUCu06mBy6R80aUhSXBwF14KDP4tVBxdnXR1cBUHwB8TRyUnRRUr8Lim0iPGO4x7e+96Xu+8AoV5mmtUxDmi6baYScTGTXRW7XhGkGUYPhmVmGXOSlITv+LpHgO93MZ7lX/fnCKs5iwEBkXiWGaZNvEE8vWkbnPeJI6woq8TnxGMmXZD4keuKx2+cCy4LPDNiplPzxBFisdDGShuzoqkRTxFHVU2nfCHjscp5i7NWrrLmPfkLQzl9ZZnrtIaQwCKWIEGEgipKKMNGjHadFAspOo/7+Addv0QuhVwlMHIsoAINsusH/4PfvbXykxNeUigOdL44zscI0LULNGqO833sOI0TIPgMXOktf6UOzHySXmtp0SOgbxu4uG5pyh5wuQMMPBmyKbtSkJaQzwPvZ/RNWaD/Fuhd8/rWPMfpA5CmXiVvgINDYLRA2es+7+5u79u/Nc3+/QAHZnJ84H+0RgAAAAZiS0dEAAAAAAAA+UO7fwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB+YDAw0KGlaJBaIAAAOPSURBVHja7ZvPS1VBFMc/6cvwB0Wgm1pFi9ASDPsBFSYEglA86PU3SOuE+gd0r0vXutKFJLxd9GOh8HBhlLqxyB6oC9uI5MJ82aJ5dBlm3tzmztwfvPuFi8zz3jPfOXfmnDNnzoUcOXLkyNG8OBNTP33AMDAA9APdwBWgVfy/BmwD+8A6sAZ8ADayrNxBYArYBU4tr11gGriVpYGXgEqEQeuuCvAszQO/C6x6GLh8rYq+UoMOMU0bkT4EXgOvgBHgOlAIyCiI30aAl+LeQ4PMadF3orgqDJWOZBkoAm0Wss+KZ8sN5G8KDolgCDjQEJsHeh321Stkqvo6EFxixSPgSEFmS7g7XxgWfcj9HglOsb151eDngM4Y+u8EZjVKGIpjzaum/XgCS/CFZjl4swkdGoM3ZiFnEqiK56uibWPRxxR8Nnx5h2kHb74DWNEYs2VL4uMaF+k8yJE7mbWQM2nw7ZOW/OYUspwGS6sKa29j8KoGBVQjGMYtRcToLLaXidq6ujChbhQXKcsquVBARRHk2MI0A75H5Dqv2EBF3tLKJKNEeCYbMOEgYpRlDrq0/GUHrlTnBVYcuS957zAVRZiczCg6iicmHMUBKhQVSRXrNJa8pW0j/WhTbKX7dDe3GKxqEG+B4wwo4Bh4ZxhLKAXclNrLGUrLyVwHdDcWGgi5IbU/WpKZEX9bgXbgEtDF34z0qfjtAtADnAPuOAhi1qR2v40CeqT2jiWZsQRmgMy1W3djo3OBE/7l7espqhMLMs+B38B54DHw0HC/ixlQAH4F2jXDyw4VtrrCJ0MwdNtRP6H4tyQwPb+myVo2UkDtP+xF2lAwjCWUAral9rUMKUDm+s1GAftS+3KGFCBz/WGjgHVDYJRmyFw/2yhADibuZUgB910Ecb42Q4ue3aCzzdAmsBdodwGjGXj7o4JrHXtiLFZxwEIKwtqooXeUFJ7zlJjvJeA8JQZuk6K+FeA8KQpu0+I+FTCMp7Q4uDsYAXhjUMADC5leD0ZAfTQ2F/LZVuGaLgJPgJ8GBSyKBEa72IKHgfejMbA/HJ0hWlGUCbEcjoL98bhPBcR6PA7pKpBQvXmvBRJ1pKFERrXmYymRqUNXJPWFJiiSCs6Epi2TC9qEJAslN0iwUDLoHcKUyi4RvlR2iYyUysrBUlMWS8t4ir9y+RIZQv2DiR2ifzAx6Itkmj+Zed8ok5MjR44cOXJExx+XlqahG0Iq8wAAAABJRU5ErkJggg=='
-     
+
 tooltip_1 = '<name before . in image file>: \nexample, from image filename \"reg001_cyc001_ch001_DAPI1.tif\"-> DAPI1'
 tooltip_2 = '<number of pixels>: \nexample -> 20'
 tooltip_3 = '<number of pixels, can be 0>: \nexample -> 20'
@@ -34,20 +34,20 @@ tooltip_8 = '<list of markers names before . in image files>: \nexample -> DAPI1
 tooltip_9 = '<optional, one-side approximate resolution>: \nexample -> 1000'
 tooltip_10 = '<optional, name of the column to add as cluster id information from cell_data.csv>: \nexample -> kmeans'
 tooltip_11 = '<name of the column in cell_data.csv to filter the cells by>: \nexample -> cluster_id'
-tooltip_12 = '<values, comma-separated, present in the selected colum of cell_data.csv to filter the cells by>: \nexample -> 3,6,7'  
-tooltip_13 = '<number of pixels>: \nexample -> 2048'  
-tooltip_14 = '<optional, number of pixels to be added around>: \nexample -> 128'  
-tooltip_15 = '<optional, percentage of tile size to be added around>: \nexample -> 10'  
-tooltip_16 = '<yes or no to have bigger border tiles>: \nexample -> no'  
-tooltip_17 = '<intensities below this percentage will be deleted>: \nexample -> 1' 
-tooltip_18 = '<intensities above this percentage will be deleted>: \nexample -> 99' 
-tooltip_19 = '<percentage of the image base intensity to apply>: \nexample -> 150' 
-tooltip_20 = '<number of pixels of a tile>: \nexample -> 1844' 
-tooltip_21 = '<number of pixels to use as smooth region for the tile cut>: \nexample -> 20' 
-tooltip_22 = '<yes or no to generate heat maps per image>: \nexample -> yes'  
+tooltip_12 = '<values, comma-separated, present in the selected colum of cell_data.csv to filter the cells by>: \nexample -> 3,6,7'
+tooltip_13 = '<number of pixels>: \nexample -> 2048'
+tooltip_14 = '<optional, number of pixels to be added around>: \nexample -> 128'
+tooltip_15 = '<optional, percentage of tile size to be added around>: \nexample -> 10'
+tooltip_16 = '<yes or no to have bigger border tiles>: \nexample -> no'
+tooltip_17 = '<intensities below this percentage will be deleted>: \nexample -> 1'
+tooltip_18 = '<intensities above this percentage will be deleted>: \nexample -> 99'
+tooltip_19 = '<percentage of the image base intensity to apply>: \nexample -> 150'
+tooltip_20 = '<number of pixels of a tile>: \nexample -> 1844'
+tooltip_21 = '<number of pixels to use as smooth region for the tile cut>: \nexample -> 20'
+tooltip_22 = '<yes or no to generate heat maps per image>: \nexample -> yes'
 tooltip_23 = '<optional, "strictness" of stardist detections, gradation between 0.001 and 0.999>: \nexample -> 0.5'
-tooltip_24 = '<number, main levels of intensity in the image [normally 3-5] and their 2 selected focus>: \nexample -> 4:1:3'  
-tooltip_25 = '<number, factor of complexity of light issues [1 to 4 should be enough]>: \nexample -> 3'  
+tooltip_24 = '<number, main levels of intensity in the image [normally 3-5] and their 2 selected focus>: \nexample -> 4:1:3'
+tooltip_25 = '<number, factor of complexity of light issues [1 to 4 should be enough]>: \nexample -> 3'
 tooltip_26 = '<yes or no to reduce artifacts or foldings to a main intensity level>: \nexample -> yes'
 tooltip_27 = '<optional, list of present specific markers to analyze>: \nexample -> AMY2A,SST,GORASP2'
 tooltip_28 = '<percentage of biggest cells to remove>: \nexample -> 5'
@@ -69,7 +69,8 @@ tooltip_43 = '<optional, "strictness" of stardist detections proximity, gradatio
 tooltip_44 = '<optional, maximum allowed pixel area for initial Stardist detections>: \nexample -> 1600'
 tooltip_45 = '<optional, yes or no to relabel sequentially the tile segments>: \nexample -> yes'
 tooltip_46 = '<optional, file path to a pre-made custom segmentation>`: \nexample -> -custom_segmentation=/data/custom_seg.npy'
-     
+tooltip_47 = '<optional, yes or no to refine the cluster results through cell_types.csv data>: \nexample -> yes'
+
 sg.theme('LightBrown10')
 
 column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data_folder, size=(50,1), key='-DATA_FOLDER-'), sg.FolderBrowse(initial_folder=data_folder)],
@@ -119,6 +120,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Perform Kmeans cluster', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_KMEANS-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_30)],
           [sg.Text('  - K clusters:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='10',s=20,disabled=True, key='-ANALYSIS_KCLUST-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_32)],
           [sg.Text('  - Calculate elbow method', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_ELBOW-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_31)],
+          [sg.Text('  - Refine clusters', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_REFINE-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_47)],
           [sg.Text('_'*85)],
           [sg.Checkbox('QuPath GeoJSON', font='any 12 bold', key='-QUPATH-', enable_events=True)],
           [sg.Text(' NOTE: requires previous \'Segmentation\' results', pad=((20,0), (0,0)))],
@@ -222,6 +224,7 @@ while True:
         window['-ANALYSIS_KMEANS-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_REFINE-'].update(disabled=(not values['-ANALYSIS-']))
         if (values['-ANALYSIS-']):
             window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
             window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
@@ -259,17 +262,17 @@ while True:
         window['-FILTERED_TILPER-'].update(disabled=(not values['-FILTERED_TILING-']))
         window['-FILTERED_TILLAB-'].update(disabled=(not values['-FILTERED_TILING-']))
         window['-FILTERED_TILEXT-'].update(disabled=(not values['-FILTERED_TILING-']))
-        
+
 window.close()
 
 if cancel:
     sys.exit()
-    
+
 if batch_mode:
     if "PIPEX_WORK" in os.environ:
-        os.system("sudo docker-compose up pipex") 
+        os.system("sudo docker-compose up pipex")
     else:
-        pipex.batch_processor() 
+        pipex.batch_processor()
     sys.exit()
 
 batch_filename = './pipex_batch_list.txt'
@@ -279,26 +282,26 @@ if "PIPEX_WORK" in os.environ:
     batch_filename = os.environ['PIPEX_WORK'] + '/pipex_batch_list.txt'
     batch_data = batch_data.replace(os.environ['PIPEX_WORK'], './work')
     custom_segmentation_file = custom_segmentation_file.replace(os.environ['PIPEX_WORK'], './work')
-        
+
 batch_list = ''
 if values['-PREPROCESS-']:
-    batch_list = (batch_list + '\n' + 
+    batch_list = (batch_list + '\n' +
         'preprocessing.py -data=' + batch_data +
-        ' -threshold_min=' + values['-PREPROCESS_THRMIN-'] + 
+        ' -threshold_min=' + values['-PREPROCESS_THRMIN-'] +
         ' -threshold_max=' + values['-PREPROCESS_THRMAX-'] +
         ' -exposure=' + values['-PREPROCESS_EXPOSU-'] +
         ' -heat_map=' + ('yes' if values['-PREPROCESS_HEAMAP-'] else 'no'))
-    if (values['-PREPROCESS_TILFIX-']):       
-        batch_list = (batch_list +  
+    if (values['-PREPROCESS_TILFIX-']):
+        batch_list = (batch_list +
             ' -tile_size=' + values['-PREPROCESS_TILSIZ-'] +
             ' -bright_levels=' + values['-PREPROCESS_TILOTS-'] +
             ' -flatten_spots=' + ('yes' if values['-PREPROCESS_TILFLA-'] else 'no') +
             ' -light_gradient=' + values['-PREPROCESS_TILKER-'] +
             ' -balance_tiles=yes' +
             ' -stitch_size=' + values['-PREPROCESS_TILSTI-'])
-            
+
 if values['-SEGMENTATION-']:
-    batch_list = (batch_list + '\n' + 
+    batch_list = (batch_list + '\n' +
         'segmentation.py -data=' + batch_data +
         ' -nuclei_marker=' + values['-SEGMENTATION_NUCMARK-'] +
         ' -nuclei_diameter=' + values['-SEGMENTATION_NUCDIAM-'] +
@@ -307,8 +310,8 @@ if values['-SEGMENTATION-']:
         ' -nuclei_closeness=' + values['-SEGMENTATION_NUCCLOS-'] +
         ' -nuclei_area_limit=' + values['-SEGMENTATION_NUCARLI-'] +
         ' -adjust_images=' + ('yes' if values['-SEGMENTATION_ADJUST-'] else 'no'))
-    if (values['-SEGMENTATION_MEMUSE-']):       
-        batch_list = (batch_list +  
+    if (values['-SEGMENTATION_MEMUSE-']):
+        batch_list = (batch_list +
             ' -membrane_marker=' + values['-SEGMENTATION_MEMMARK-'] +
             ' -membrane_diameter=' + values['-SEGMENTATION_MEMDIAM-'] +
             ' -membrane_compactness=' + values['-SEGMENTATION_MEMCOMP-'] +
@@ -316,36 +319,39 @@ if values['-SEGMENTATION-']:
     if (values['-SEGMENTATION_CUSSEG-'] != ''):
         batch_list = (batch_list +
             ' -custom_segmentation=' + custom_segmentation_file)
-    if (values['-SEGMENTATION_MEASURE-'] != ''):     
-        batch_list = (batch_list +  
+    if (values['-SEGMENTATION_MEASURE-'] != ''):
+        batch_list = (batch_list +
             ' -measure_markers=' + values['-SEGMENTATION_MEASURE-'])
-            
+
 if values['-ANALYSIS-']:
-    batch_list = (batch_list + '\n' + 
+    batch_list = (batch_list + '\n' +
         'analysis.py -data=' + batch_data +
-        ' -image_size=' + values['-ANALYSIS_SIZE-'] + 
+        ' -image_size=' + values['-ANALYSIS_SIZE-'] +
         ' -cellsize_max=' + values['-ANALYSIS_TOPTHR-'] +
-        ' -cellsize_min=' + values['-ANALYSIS_BOTTHR-'] +  
-        ' -custom_filter=' + ('yes' if values['-ANALYSIS_CUSFIL-'] else 'no') + 
-        ' -log_norm=' + ('yes' if values['-ANALYSIS_LOGNOR-'] else 'no') + 
-        ' -std_norm=' + ('yes' if values['-ANALYSIS_STDNOR-'] else 'no') + 
-        ' -quantile_norm=' + ('yes' if values['-ANALYSIS_QUANOR-'] else 'no') + 
+        ' -cellsize_min=' + values['-ANALYSIS_BOTTHR-'] +
+        ' -custom_filter=' + ('yes' if values['-ANALYSIS_CUSFIL-'] else 'no') +
+        ' -log_norm=' + ('yes' if values['-ANALYSIS_LOGNOR-'] else 'no') +
+        ' -std_norm=' + ('yes' if values['-ANALYSIS_STDNOR-'] else 'no') +
+        ' -quantile_norm=' + ('yes' if values['-ANALYSIS_QUANOR-'] else 'no') +
         ' -batch_corr=' + values['-ANALYSIS_BATCOR-'] +
         ' -use_bin=' + ('yes' if values['-ANALYSIS_USEBIN-'] else 'no'))
-    if (values['-ANALYSIS_LEIDEN-']): 
-        batch_list = (batch_list +  
-            ' -leiden=' + ('yes' if values['-ANALYSIS_LEIDEN-'] else 'no'))    
-    if (values['-ANALYSIS_KMEANS-']): 
-        batch_list = (batch_list +  
+    if (values['-ANALYSIS_LEIDEN-']):
+        batch_list = (batch_list +
+            ' -leiden=' + ('yes' if values['-ANALYSIS_LEIDEN-'] else 'no'))
+    if (values['-ANALYSIS_KMEANS-']):
+        batch_list = (batch_list +
             ' -kmeans=' + ('yes' if values['-ANALYSIS_KMEANS-'] else 'no') +
-            ' -k_clusters=' + values['-ANALYSIS_KCLUST-'] + 
-            ' -elbow=' + ('yes' if values['-ANALYSIS_ELBOW-'] else 'no'))     
-    if (values['-ANALYSIS_MARKER-'] != ''):     
-        batch_list = (batch_list +  
+            ' -k_clusters=' + values['-ANALYSIS_KCLUST-'] +
+            ' -elbow=' + ('yes' if values['-ANALYSIS_ELBOW-'] else 'no'))
+    if (values['-ANALYSIS_REFINE-']):
+        batch_list = (batch_list +
+            ' -refine_clusters=' + ('yes' if values['-ANALYSIS_REFINE-'] else 'no'))
+    if (values['-ANALYSIS_MARKER-'] != ''):
+        batch_list = (batch_list +
             ' -analysis_markers=' + values['-ANALYSIS_MARKER-'])
-            
+
 if values['-QUPATH-']:
-    batch_list = (batch_list + '\n' + 
+    batch_list = (batch_list + '\n' +
         'generate_geojson.py -data=' + batch_data)
     if (values['-QUPATH_MARKER-'] != ''):
         batch_list = (batch_list +
@@ -356,16 +362,16 @@ if values['-QUPATH-']:
     if (values['-QUPATH_CLUCOL-'] != ''):
         batch_list = (batch_list +
                       ' -cluster_color=' + values['-QUPATH_CLUCOL-'])
-        
+
 if values['-FILTERED-']:
-    batch_list = (batch_list + '\n' + 
+    batch_list = (batch_list + '\n' +
         'generate_filtered_masks.py -data=' + batch_data)
-    if (values['-FILTERED_CLUFIL-']):       
-        batch_list = (batch_list +  
+    if (values['-FILTERED_CLUFIL-']):
+        batch_list = (batch_list +
             ' -field=' + values['-FILTERED_FIELD-'] +
             ' -values=' + values['-FILTERED_VALUE-'])
-    if (values['-FILTERED_TILING-']):       
-        batch_list = (batch_list +  
+    if (values['-FILTERED_TILING-']):
+        batch_list = (batch_list +
             ' -tile_size=' + values['-FILTERED_TILSIZ-'] +
             ' -tile_overlap=' + values['-FILTERED_TILOVE-'] +
             ' -tile_percentage_overlap=' + values['-FILTERED_TILPER-'] +
@@ -373,12 +379,11 @@ if values['-FILTERED-']:
             ' -extend_tile=' + ('yes' if values['-FILTERED_TILEXT-'] else 'no'))
 
 if (batch_list != ''):
-    batch_list = '#Auto-generated by PIPEX GUI' + batch_list + '\n'       
+    batch_list = '#Auto-generated by PIPEX GUI' + batch_list + '\n'
     with open(batch_filename,'w') as f:
-        f.writelines(batch_list)  
-    
-    if "PIPEX_WORK" in os.environ:
-        os.system("sudo docker-compose up pipex") 
-    else:
-        pipex.batch_processor() 
+        f.writelines(batch_list)
 
+    if "PIPEX_WORK" in os.environ:
+        os.system("sudo docker-compose up pipex")
+    else:
+        pipex.batch_processor()

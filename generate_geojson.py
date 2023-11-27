@@ -37,19 +37,20 @@ def options(argv):
             elif arg.startswith('-cluster_color='):
                 global cluster_color
                 cluster_color = arg[15:]
-                
+
 
 if __name__ =='__main__':
     options(sys.argv[1:])
-    
+
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
-                
+        f.close()
+
     print(">>> Start time generate_geojson =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
-    
+
     #Load segmentation data in numpy array format
     labels = np.load(data_folder + '/analysis/segmentation_data.npy')
     df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
@@ -69,7 +70,7 @@ if __name__ =='__main__':
     # If a specific list of markers is informed, we use it
     if len(included_markers) > 0:
         markers = included_markers
-             
+
     #calculate segmentation polygons via fast chaincodes from diplib
     chaincodes = dip.GetImageChainCodes(labels.astype('uint32'))
     borders = {}
@@ -96,14 +97,14 @@ if __name__ =='__main__':
             "object_type" : "detection",
             "isLocked" : "false",
             }
-        
+
         cell_data["properties"]["measurements"] = []
         for marker in markers:
-            cell_data["properties"]["measurements"].append({ 
+            cell_data["properties"]["measurements"].append({
                 "name" : marker,
-                "value" : str(df[cell_row][marker].values[0]) 
+                "value" : str(df[cell_row][marker].values[0])
                 })
-        
+
         #if cluster_id parameter is selected, add cluster_id and cluster_color
         if cluster_id != '' and len(df[cell_row][cluster_id]) > 0:
             cell_data["properties"]["classification"] = {
@@ -115,6 +116,5 @@ if __name__ =='__main__':
     #dump GEOdata variable to json file
     with open(data_folder + '/analysis/cell_segmentation_geo.json', 'w') as outfile:
         geojson.dump(GEOdata, outfile)
-        
-    print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
+    print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)

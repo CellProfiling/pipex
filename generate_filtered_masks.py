@@ -47,37 +47,38 @@ def options(argv):
                 tile_overlap_percentage = int(arg[25:])
             elif arg.startswith('-tile_relabel='):
                 global tile_relabel
-                tile_relabel = int(arg[14:])
+                tile_relabel = arg[14:]
             elif arg.startswith('-extend_tile='):
                 global extend_tile
                 extend_tile = arg[13:]
-                
+
 
 if __name__ =='__main__':
     options(sys.argv[1:])
-    
-    pidfile_filename = './RUNNING'    
+
+    pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
-                                
+        f.close()
+
     print(">>> Start time generate_filtered_masks =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
-    
+
     #Load segmentation data in numpy array format
     labels = np.load(data_folder + '/analysis/segmentation_data.npy')
     df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
-        
+
     if (field != "" and values != ""):
         value_array = values.split(",")
         value_array = [int(i) for i in value_array]
-    
+
         df_filtered = df[df[field].isin(value_array)]
-        label_list = df_filtered['cell_id'].tolist()   
-    
+        label_list = df_filtered['cell_id'].tolist()
+
         ix = np.in1d(labels.ravel(), label_list).reshape(labels.shape)
         labels = np.where(ix, labels, 0)
-    
+
         np.save(data_folder + '/analysis/segmentation_data_filtered.npy', labels)
         print(">>> Filtered segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
@@ -88,12 +89,12 @@ if __name__ =='__main__':
         del labelsBinary
 
         imsave(data_folder + "/analysis/segmentation_filtered_mask.tif", np.uint16(labels * 65535))
-        print(">>> Filtered segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)  
-        
-    if (tile_size > 0): 
+        print(">>> Filtered segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+
+    if (tile_size > 0):
         if (tile_overlap == 0 and tile_overlap_percentage > 0):
             tile_overlap = int(tile_size * tile_overlap_percentage / 100)
-            
+
         num_rows = int(len(labels) / tile_size)
         if (len(labels) % tile_size != 0 and extend_tile == 'no'):
             num_rows = num_rows + 1
@@ -107,19 +108,19 @@ if __name__ =='__main__':
                 min_x = (column * tile_size)
                 max_x = ((column + 1) * tile_size)
                 if (tile_overlap > 0):
-                    if (row > 0): 
+                    if (row > 0):
                         min_y = min_y - tile_overlap
-                    if (column > 0): 
+                    if (column > 0):
                         min_x = min_x - tile_overlap
-                    if (row < num_rows - 1): 
+                    if (row < num_rows - 1):
                         max_y = max_y + tile_overlap
-                    if (column < num_columns - 1): 
+                    if (column < num_columns - 1):
                         max_x = max_x + tile_overlap
-                if (extend_tile == 'yes'):        
-                    if (row == num_rows - 1): 
+                if (extend_tile == 'yes'):
+                    if (row == num_rows - 1):
                         max_y = len(labels)
-                    if (column == num_columns - 1): 
-                        max_x = len(labels[0])                             
+                    if (column == num_columns - 1):
+                        max_x = len(labels[0])
 
                 tile = labels[min_y:max_y, min_x:max_x]
                 if tile_relabel == "yes":
@@ -135,8 +136,7 @@ if __name__ =='__main__':
                 del tileBinary
 
                 imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_mask.tif", np.uint16(tile * 65535))
-                print(">>> Filtered segmentation tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)  
-                
-           
-    print(">>> End time generate_filtered_masks =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Filtered segmentation tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
 
+
+    print(">>> End time generate_filtered_masks =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
