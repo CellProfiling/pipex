@@ -155,6 +155,12 @@ There are currently available the following commands:
   - `-exposure=<number, percentage of the base intensity>` : example -> -exposure=150. **OBS**: this increases the exposure of the image once it has been preprocessed
   - `-heat_map=<yes or no>` : example -> -heat_map=yes. **OBS**: this generates a heat_map of the preprocessed image
   
+- `generate_tissuumaps.py` : generates TissUUmaps project for interactive visualization and quality control of the downstream analysis and cell segmentation. Uses the following parameters:
+  - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
+  - `-include_marker_images=<yes or no or list of present specific markers to display as image layers>` : example -> -include_marker_images=DAPI,SST,GORASP2. **OBS**: this includes the specified markers as image layers in the TissUUmaps project. If this is not set, no image layers will be included
+  - `-include_geojson=<yes or no to include cell segmentation as regions>` : example -> -include_geojson=yes. **OBS**: this includes the cell segmentation as regions in the TissUUmaps project. If this is not set, no regions will be included
+  - `-include_html=<yes or no to export html page for sharing the TissUUmaps project on the web>` : example -> -include_marker_images=yes. **OBS**: this includes the html page for sharing the TissUUmaps project on the web. A web server is needed to visualize the exported web page
+  
 *Example 2*: contents of `pipex_batch_list.txt` for the images from *example 1*
 <code>
 
@@ -171,6 +177,8 @@ There are currently available the following commands:
     #need full QuPath integration, with cluster
 
     generate_geojson.py -data=/home/lab/pipeline/data -expand=yes
+
+    generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -include_html=yes
 </code>
 
 
@@ -196,6 +204,8 @@ This will generate the following sub-folders and items inside the data folder:
   - Several image files: the filename shows the data represented in them. **OBS** this files will only be present if you have run the analysis command)
   - `cell_data_norm.csv`: filtered and normalized version of `cell_data.csv` general file. **OBS** this file will only be present if you have run the analysis command)
   - `cell_data_markers.csv`: aggregated data for each of the analyzed markers. **OBS** this file will only be present if you have run the analysis command)
+  - `anndata.h5ad`: AnnData object containing the analysis output. **OBS** this file will only be present if you have run the analysis command)
+  - `anndata_TissUUmaps.h5ad`: TissUUmaps project file. **OBS** this file will only be present if you have run the generate_tissuumaps command)
 - `analysis/quality_control` folder: it contains the following items:
   - Several image files: these are image representations of intermediate steps of the cell segmentation process. Useful as post-verification and/or to refine the parameters if the result is not what you expected.
 - `preprocessed` folder: it contains the following items:
@@ -235,6 +245,16 @@ If you add the `generate_geojson` command to PIPEX command list a `cell_segmenta
 - Enjoy!
 
 **NOTE**: the geojson structure and groovy script provided work for current QuPath 0.3 version. QuPath program is in a early stage of development, with a very lacking in-depth (scripting wise) documentation. Most of the geojson format and importing mechanism has been deduced from the source code and nothing prevents its author to change them at any point in the future.
+
+
+TissUUmaps integration
+------------------
+
+If you add the `generate_tissuumaps` command to PIPEX command list a `anndata_TissUUmaps.h5ad` file will be generated in your analysis/downstream sub-folder. You can open this file in TissUUmaps. To do so:
+ - Install TissUUmaps (https://tissuumaps.github.io/TissUUmaps-docs/docs/intro/installation.html)
+ - Load the `anndata_TissUUmaps.h5ad` file in TissUUmaps
+
+If you add the `include_html=yes` parameter to the `generate_tissuumaps` command, a `TissUUmaps_webexport` folder will be generated in your analysis/downstream sub-folder. You can share this file on a web server, and access it from any web browser.
 
 
 

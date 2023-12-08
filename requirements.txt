@@ -19,3 +19,4 @@ squidpy==1.2.0
 stardist==0.8.5
 tensorflow==2.15.0
 tifffile==2022.8.12
+TissUUmaps==3.2.0.2
