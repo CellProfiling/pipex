@@ -91,12 +91,14 @@ if __name__ =='__main__':
         cell_data["type"] = "Feature"
         cell_data["geometry"] = {
             "type" : "Polygon",
-            "coordinates" : [final_coords]}
+            "coordinates" : [final_coords],
+        }
         cell_data["properties"] = {
             "name" : "cell" + str(label),
             "object_type" : "detection",
             "isLocked" : "false",
-            }
+            "collectionIndex": 0,
+        }
 
         cell_data["properties"]["measurements"] = []
         for marker in markers:
