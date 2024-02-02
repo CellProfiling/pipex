@@ -72,7 +72,8 @@ tooltip_46 = '<optional, file path to a pre-made custom segmentation>`: \nexampl
 tooltip_47 = '<optional, yes or no to refine the cluster results through cell_types.csv data>: \nexample -> yes'
 tooltip_48 = '<optional, yes or no or list of present specific markers to display as image layers> : example -> DAPI,SST,GORASP2'
 tooltip_49 = '<optional, yes or no to include cell segmentation as regions> : example -> yes'
-tooltip_50 = '<optional, yes or no to export html page for sharing the TissUUmaps project on the web> : example -> yes'
+tooltip_50 = '<optional, yes or no to compress geojson regions into pbf> : example -> yes'
+tooltip_51 = '<optional, yes or no to export html page for sharing the TissUUmaps project on the web> : example -> yes'
 
 
 
@@ -152,7 +153,8 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text(' NOTE: requires previous \'QuPath GeoJSON\' results if you want to include regions', pad=((20,0), (0,0)))],
           [sg.Text('  - Include marker images, comma-separated:', s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-TISSUUMAPS_MARKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_48)],
           [sg.Text('  - Include regions', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_REGION-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_49)],
-          [sg.Text('  - Include html', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_HTML-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_50)]]
+          [sg.Text('  - Compress regions', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_COMPRESS_REGIONS-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_50)],
+          [sg.Text('  - Include html', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_HTML-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_51)]]
 
 layout = [[sg.Column(column, scrollable=True,  vertical_scroll_only=True, size=(620,700))],
           [sg.Text('_'*85)],
@@ -277,6 +279,7 @@ while True:
     if event == '-TISSUUMAPS-':
         window['-TISSUUMAPS_MARKER-'].update(disabled=(not values['-TISSUUMAPS-']))
         window['-TISSUUMAPS_REGION-'].update(disabled=(not values['-TISSUUMAPS-']))
+        window['-TISSUUMAPS_COMPRESS_REGIONS-'].update(disabled=(not values['-TISSUUMAPS-']))
         window['-TISSUUMAPS_HTML-'].update(disabled=(not values['-TISSUUMAPS-']))
 
 window.close()
@@ -399,6 +402,7 @@ if values['-TISSUUMAPS-']:
         'generate_tissuumaps.py -data=' + batch_data +
         ' -include_marker_images=' + values['-TISSUUMAPS_MARKER-'] +
         ' -include_geojson=' + ('yes' if values['-TISSUUMAPS_REGION-'] else 'no') +
+        ' -compress_geojson=' + ('yes' if values['-TISSUUMAPS_COMPRESS_REGIONS-'] else 'no') +
         ' -include_html=' + ('yes' if values['-TISSUUMAPS_HTML-'] else 'no'))
 
 if (batch_list != ''):
