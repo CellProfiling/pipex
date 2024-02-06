@@ -159,6 +159,7 @@ There are currently available the following commands:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
   - `-include_marker_images=<yes or no or list of present specific markers to display as image layers>` : example -> -include_marker_images=DAPI,SST,GORASP2. **OBS**: this includes the specified markers as image layers in the TissUUmaps project. If this is not set, no image layers will be included
   - `-include_geojson=<yes or no to include cell segmentation as regions>` : example -> -include_geojson=yes. **OBS**: this includes the cell segmentation as regions in the TissUUmaps project. If this is not set, no regions will be included
+  - `-compress_geojson=<yes or no to compress geojson regions into pbf>` : example -> -compress_geojson=yes. **OBS**: this includes the cell segmentation regions as a compressed pbf file
   - `-include_html=<yes or no to export html page for sharing the TissUUmaps project on the web>` : example -> -include_marker_images=yes. **OBS**: this includes the html page for sharing the TissUUmaps project on the web. A web server is needed to visualize the exported web page
   
 *Example 2*: contents of `pipex_batch_list.txt` for the images from *example 1*
@@ -178,7 +179,7 @@ There are currently available the following commands:
 
     generate_geojson.py -data=/home/lab/pipeline/data -expand=yes
 
-    generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -include_html=yes
+    generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -compress_geojson -include_html=yes
 </code>
 
 
