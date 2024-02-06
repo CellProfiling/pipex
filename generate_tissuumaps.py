@@ -15,8 +15,14 @@ compress_geojson = "no"
 include_html = "no"
 
 def exporting_tissuumaps ():
+    # Check if the required files are present
     if include_marker_images == "no" and include_geojson == "yes":
         print(">>> Impossible to display geojson without a background image", flush=True)
+        include_geojson = "no"
+    if include_geojson == "yes":
+        if not os.path.exists(os.path.join(data_folder, 'analysis/cell_segmentation_geo.json')):
+            print(">>> Impossible to display geojson without a cell segmentation file", flush=True)
+            include_geojson = "no"
     
     adata = sc.read_h5ad(os.path.join(data_folder, 'analysis/downstream/anndata.h5ad'))
 
