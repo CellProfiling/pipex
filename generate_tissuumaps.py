@@ -16,6 +16,7 @@ include_html = "no"
 
 def exporting_tissuumaps ():
     # Check if the required files are present
+    global include_geojson
     if include_marker_images == "no" and include_geojson == "yes":
         print(">>> Impossible to display geojson without a background image", flush=True)
         include_geojson = "no"
