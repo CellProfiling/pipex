@@ -21,7 +21,7 @@ def batch_processor():
         pidfile_filename = './work/RUNNING'
         log_filename = './work/log.txt'
 
-    print(">>> Start time pipex =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time pipex =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     swap_used = False
     batch_file = open(batch_filename, 'r')
@@ -30,7 +30,7 @@ def batch_processor():
             with open(pidfile_filename,'r') as f:
                 lines = f.readlines()
                 if psutil.pid_exists(int(lines[0])):
-                    print(">>> Another PIPEX process seems to be running, exiting =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                    print(">>> Another PIPEX process seems to be running, exiting =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                     sys.exit()
         except IOError:
             pass
@@ -44,27 +44,29 @@ def batch_processor():
             continue
         elif curr_command.startswith('swap'):
             #creating required swap via bash script 'enable_swap.sh'
-            print(">>> Creating swap space =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+            print(">>> Creating swap space =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             swap_req = curr_command.replace('swap', '').strip()
             os.system('./enable_swap.sh ' + swap_req)
             swap_used = True
         elif len(curr_command.strip()) > 5:
             #pipex command
-            print(">>> Processing next job =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
-            print('>>>    ' + curr_command.strip())
-            os.system(python_command + curr_command.strip())
-            if curr_command.index('-data=') > 0:
-                arg_start_index = curr_command.index('-data=') + 6
-                end_char = ' '
-                if curr_command[arg_start_index:arg_start_index + 1] == '\'':
-                    end_char = '\''
-                    arg_start_index = arg_start_index + 1
-                elif curr_command[arg_start_index:arg_start_index + 1] == '\"':
-                    end_char = '\"'
-                    arg_start_index = arg_start_index + 1
-                arg_end_index = curr_command.index(end_char, arg_start_index + 1)
-                curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
-                shutil.copyfile(log_filename, curr_data_folder + '/' + os.path.basename(log_filename))
+            try:
+                print(">>> Processing next job =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                print('>>>    ' + curr_command.strip())
+                os.system(python_command + curr_command.strip())
+            except Exception:
+                if curr_command.index('-data=') > 0:
+                    arg_start_index = curr_command.index('-data=') + 6
+                    end_char = ' '
+                    if curr_command[arg_start_index:arg_start_index + 1] == '\'':
+                        end_char = '\''
+                        arg_start_index = arg_start_index + 1
+                    elif curr_command[arg_start_index:arg_start_index + 1] == '\"':
+                        end_char = '\"'
+                        arg_start_index = arg_start_index + 1
+                    arg_end_index = curr_command.index(end_char, arg_start_index + 1)
+                    curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
+                    shutil.copyfile(log_filename, curr_data_folder + '/' + os.path.basename(log_filename))
  
     batch_file.close()
 
@@ -73,7 +75,7 @@ def batch_processor():
 
     if swap_used:
         #deleting previously created swap via bash script 'disable_swap.sh'
-        print(">>> Deleting swap space =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Deleting swap space =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         os.system('./disable_swap.sh')
 
     for file in os.listdir('.'):
@@ -83,7 +85,7 @@ def batch_processor():
     if os.path.exists(pidfile_filename):
         os.remove(pidfile_filename)
 
-    print(">>> End time pipex =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time pipex =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
 if __name__ == '__main__':

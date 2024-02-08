@@ -71,7 +71,7 @@ def apply_tile_compensation(f_name, np_img, bins, tile_data, local_tile_size, lo
                 np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)] = np.reshape(np.array([rescale_tile_intensity(x, curr_mean, mean_factor, curr_dev, dev_factor, bins) for x in np.ravel(tile)]), (local_tile_size, local_tile_size))
 
     if (tile_size == local_tile_size):
-        print(">>> Balanced tiles for image",f_name,"=",datetime.datetime.now().strftime("%H:%M:%S"),flush=True)
+        print(">>> Balanced tiles for image",f_name,"=",datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
 
     if (local_stitch_size > 0):
         for row in range(num_rows):
@@ -96,7 +96,7 @@ def apply_tile_compensation(f_name, np_img, bins, tile_data, local_tile_size, lo
                         np_img[streg_min_y:streg_max_y, streg_min_x:streg_max_x] = cv2.GaussianBlur(stitch, (kernel_size, kernel_size), 0)
 
         if (tile_size == local_tile_size):
-            print(">>> Smoothed stitched lines for image",f_name,"=", datetime.datetime.now().strftime("%H:%M:%S"),flush=True)
+            print(">>> Smoothed stitched lines for image",f_name,"=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
 
 
 def generate_tile_compensation_data(np_img, bins, local_tile_size):
@@ -149,7 +149,7 @@ def generate_tile_compensation_data(np_img, bins, local_tile_size):
                     tile_data['chosen'] = curr_data
 
     if (tile_size == local_tile_size):
-        print(">>> Calculated reference tiles balance =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Calculated reference tiles balance =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     return tile_data
 
@@ -188,7 +188,7 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
 
     imsave(data_folder + "/preprocessed/" + os.path.splitext(file)[0] + "_gradient.jpg", np.uint8(np_img * 255))
 
-    print(">>> Applied gradient fix for image",f_name,"=", datetime.datetime.now().strftime("%H:%M:%S"),flush=True)
+    print(">>> Applied gradient fix for image",f_name,"=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
 
 
 def generate_tile_gradient_data(np_img, bins, tile_size):
@@ -244,7 +244,7 @@ def generate_tile_gradient_data(np_img, bins, tile_size):
             tile_gradient['max_gradient_kernel'] = max_gradient_kernel
             gradient_data[row][column] = tile_gradient
 
-    print(">>> Calculated reference tiles gradient =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Calculated reference tiles gradient =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     return gradient_data
 
@@ -265,7 +265,7 @@ def apply_thresholds(f_name, np_img, threshold_min, threshold_max):
         np_img[np_img > threshold_max] = 0
 
     if (f_name != ''):
-       print(">>> Applied min and max thresholds =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+       print(">>> Applied min and max thresholds =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
 #Function to handle the command line parameters passed
@@ -433,11 +433,11 @@ def preprocess_image(f_name, numpy_img):
     if (exposure != 1):
         np_img = np.reshape(np.array([max(0, min(1, x * exposure)) for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
     imsave(data_folder + "/preprocessed/" + f_name, np.uint16(np_img * 65535))
-    print(">>> Preprocessed result image",f_name,"saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Preprocessed result image",f_name,"saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (heat_map == 'yes'):
         imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + '_heatmap.jpg', cv2.applyColorMap(np.uint8(np.reshape(np.array([1 - x for x in np.ravel(np_img)]), (len(np_img), len(np_img[0]))) * 255), cv2.COLORMAP_PARULA))
-        print(">>> Preprocessed heatmap for image ",f_name,"saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Preprocessed heatmap for image ",f_name,"saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
 if __name__ =='__main__':
@@ -450,7 +450,7 @@ if __name__ =='__main__':
         f.write(str(os.getpid()))
         f.close()
 
-    print(">>> Start time preprocessing =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time preprocessing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     try:
         os.mkdir(data_folder + '/preprocessed')
@@ -493,4 +493,4 @@ if __name__ =='__main__':
                 print('>>> Could not read image ' + file_path, flush=True)
 
 
-    print(">>> End time preprocessing =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time preprocessing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

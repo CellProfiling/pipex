@@ -16,7 +16,7 @@ try:
     with open(pidfile_filename,'r') as f:
         lines = f.readlines()
         if psutil.pid_exists(int(lines[0])):
-            print(">>> Another PIPEX process seems to be running, exiting =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+            print(">>> Another PIPEX process seems to be running, exiting =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             sys.exit()
 except IOError:
     pass

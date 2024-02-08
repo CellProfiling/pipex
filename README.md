@@ -61,7 +61,12 @@ Installation
 - Profit!
 
 [Note] a docker image is also provided. Just remember to configure the environment variable for PIPEX's "work" directory.
-
+[Note] if you are installing PIPEX in your own laptop you might need some other packages/libraries. Please install these:
+- `sudo apt-get install python3.11-dev`
+- `sudo apt-get install libvips`
+- `sudo apt-get install -y python3-opencv`
+- `sudo apt-get install -y gcc`
+- `sudo apt-get install python3-tk`
 
 
 Running PIPEX

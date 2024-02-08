@@ -63,7 +63,7 @@ if __name__ =='__main__':
         f.write(str(os.getpid()))
         f.close()
 
-    print(">>> Start time generate_filtered_masks =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time generate_filtered_masks =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Load segmentation data in numpy array format
     labels = np.load(data_folder + '/analysis/segmentation_data.npy')
@@ -80,16 +80,16 @@ if __name__ =='__main__':
         labels = np.where(ix, labels, 0)
 
         np.save(data_folder + '/analysis/segmentation_data_filtered.npy', labels)
-        print(">>> Filtered segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Filtered segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
         labelsBinary = np.copy(labels)
         labelsBinary[labelsBinary > 0] = 1
         imsave(data_folder + "/analysis/segmentation_filtered_binary_mask.tif", np.uint16(labelsBinary * 65535))
-        print(">>> Filtered segmentation result binary image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Filtered segmentation result binary image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         del labelsBinary
 
         imsave(data_folder + "/analysis/segmentation_filtered_mask.tif", np.uint16(labels * 65535))
-        print(">>> Filtered segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Filtered segmentation result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (tile_size > 0):
         if (tile_overlap == 0 and tile_overlap_percentage > 0):
@@ -127,16 +127,16 @@ if __name__ =='__main__':
                     tile = relabel_sequential(tile)[0]
                 tile_desc = str(row) + '_' + str(column)
                 np.save(data_folder + '/analysis/segmentation_data_filtered_tile_' + tile_desc + '.npy', tile)
-                print(">>> Filtered segmentation tile ",tile_desc," result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Filtered segmentation tile ",tile_desc," result numpy binary data saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 tileBinary = np.copy(tile)
                 tileBinary[tileBinary > 0] = 1
                 imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_binary_mask.tif", np.uint16(tileBinary * 65535))
-                print(">>> Filtered segmentation tile ",tile_desc," result binary image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Filtered segmentation tile ",tile_desc," result binary image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 del tileBinary
 
                 imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_mask.tif", np.uint16(tile * 65535))
-                print(">>> Filtered segmentation tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Filtered segmentation tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
-    print(">>> End time generate_filtered_masks =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time generate_filtered_masks =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

@@ -26,6 +26,7 @@ from skimage.transform import resize
 PIL.Image.MAX_IMAGE_PIXELS = 10000000000
 pipex_max_resolution = 30000
 pipex_scale_factor = 0
+pipex_img_bit_depth = 255
 data_folder = os.environ.get('PIPEX_DATA')
 stardist_tile_threshold = 4096
 watershed_tile_threshold = 2048
@@ -96,7 +97,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     #if adjust_images parameter is required, check and enhance contrast and gamma levels of nuclei and membrane images
     if adjust_images == 'yes':
         if is_low_contrast(nuclei_img, fraction_threshold=0.05):
-            print(">>> Nuclei image has low contrast, equalizing =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+            print(">>> Nuclei image has low contrast, equalizing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             nuclei_img = equalize_adapthist(nuclei_img, clip_limit=0.03)
             im = PIL.Image.fromarray((nuclei_img * 255).astype(np.uint8))
             im = im.convert('RGB')
@@ -104,7 +105,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
         nuclei_hist = np.histogram(nuclei_img, bins=3)[0]
         gamma = (nuclei_hist[1] + nuclei_hist[2]) / (nuclei_hist[0] / 3)
         if gamma < 0.01:
-            print(">>> Nuclei image has low gamma, adjusting =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+            print(">>> Nuclei image has low gamma, adjusting =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             nuclei_img = nuclei_img * np.log(0.01 / gamma)
             nuclei_img = np.clip(nuclei_img, 0, 1)
             im = PIL.Image.fromarray((nuclei_img * 255).astype(np.uint8))
@@ -113,7 +114,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
 
         if membrane_diameter > 0:
             if is_low_contrast(membrane_img, fraction_threshold=0.075):
-                print(">>> Membrane image has low contrast, equalizing =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Membrane image has low contrast, equalizing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 membrane_img = equalize_adapthist(membrane_img, clip_limit=0.03)
                 im = PIL.Image.fromarray((membrane_img * 255).astype(np.uint8))
                 im = im.convert('RGB')
@@ -121,7 +122,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
             membrane_hist = np.histogram(membrane_img, bins=3)[0]
             gamma = (membrane_hist[1] + membrane_hist[2]) / (membrane_hist[0] / 3)
             if gamma < 0.01:
-                print(">>> Membrane image has low gamma, adjusting =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Membrane image has low gamma, adjusting =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 membrane_img = membrane_img * np.log(0.01 / gamma)
                 np.clip(membrane_img, 0, 1)
                 im = PIL.Image.fromarray((membrane_img * 255).astype(np.uint8))
@@ -137,7 +138,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
         sdLabels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
     else:
         sdLabels, _ = model.predict_instances(nuclei_img,axes='YX',prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
-    print(">>> Stardist prediction done =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Stardist prediction done =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if nuclei_area_limit > 0:
         detections = regionprops(sdLabels)
@@ -148,18 +149,19 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     im = PIL.Image.fromarray((render_label(sdLabels, img=None) * 255).astype(np.uint8))
     im = im.convert('RGB')
     im.save(data_folder + "/analysis/quality_control/stardist_result.jpg")
-    print(">>> Stardist base result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Stardist base result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #if nuclei_expansion parameter is required, expand labelled regions (avoiding overlap) to specified size
     if nuclei_expansion >= 0:
         sdLabelsExpanded = expand_labels(sdLabels, distance=nuclei_expansion)
         imsave(data_folder + "/analysis/quality_control/stardist_result_expanded.jpg", np.uint8(mark_boundaries(nuclei_img_orig, sdLabelsExpanded) * 255))
-        print(">>> Stardist expanded result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Stardist expanded result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
     else:
         sdLabelsExpanded = sdLabels
 
 
     #if membrane marker is provided, run custom watershed segmentation
+    affected_by_membrane = set()
     if membrane_diameter > 0:
         membrane_keep_index = -1
         membrane_intensity_mean = threshold_multiotsu(membrane_img, 5)[0]
@@ -188,10 +190,10 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                 #run a basic watershed with segments approximatelly dimensioned by membrane_diameter and high compactness
                 num_markers = (len(tile) / membrane_diameter) * (len(tile[0]) / membrane_diameter)
                 wsLabels = watershed(tile * 255, markers=num_markers, compactness=membrane_compactness)
-                print(">>> Watershed of tile ",tile_desc," done =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Watershed of tile ",tile_desc," done =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 imsave(data_folder + "/analysis/quality_control/wathershed_tile_" + tile_desc + "_result.jpg", np.uint8(mark_boundaries(tile_orig, wsLabels) * 255))
-                print(">>> Watershed of tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Watershed of tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 membrane_keep_intensity = 0
                 membrane_properties = {}
@@ -246,7 +248,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                         wsLabels[row][column] = wsRegionsMerged[wsLabels[row][column]]
 
                 imsave(data_folder + "/analysis/quality_control/wathershed_tile_" + tile_desc +"_result_merged_by_nuclei.jpg", np.uint8(mark_boundaries(tile_orig, wsLabels) * 255))
-                print(">>> Watershed of tile ",tile_desc," preliminary nuclei filter result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Watershed of tile ",tile_desc," preliminary nuclei filter result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 #cut expanded nuclei that collide with watershed segments
                 for row in range(len(wsLabels)):
@@ -259,23 +261,29 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                                 continue
                             if len(wsRegions[memLabel]) == 0:
                                 sdLabelsExpanded[row + tile_x][column + tile_y] = 0
+                                if expLabel > 0:
+                                    affected_by_membrane.add(expLabel)
                             elif expLabel == 0 or not expLabel in wsRegions[memLabel]:
                                 if membrane_keep == 'yes':
                                     membrane_only_label = 0 + sum(number for number in wsRegions[memLabel] if number < 0)
                                     sdLabelsExpanded[row + tile_x][column + tile_y] = membrane_only_label
                                 else:
                                     sdLabelsExpanded[row + tile_x][column + tile_y] = 0
+                                    if expLabel > 0:
+                                        affected_by_membrane.add(expLabel)
 
         top_positive_label = np.max(sdLabelsExpanded)
         negative_label_mask = sdLabelsExpanded < 0
         sdLabelsExpanded[negative_label_mask] = top_positive_label - sdLabelsExpanded[negative_label_mask]
+        affected_by_membrane.update(list(np.unique(sdLabelsExpanded[sdLabelsExpanded < 0])))
+
 
         #find rare disjointed segmented cells and using their associated convex hull instead
         segmentProperties = regionprops(sdLabelsExpanded)
         for segment in segmentProperties:
             contours, hierarchy = cv2.findContours(segment.image.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if len(contours) > 1:
-                print(">>> Found disjointed segment " + str(segment.label) + ", using convex hull instead =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Found disjointed segment " + str(segment.label) + ", using convex hull instead =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 bbox = segment.bbox
                 filling_image = segment.image_convex
                 if segment.solidity > 0.0:
@@ -291,21 +299,25 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     sdLabelsExpanded = relabel_sequential(sdLabelsExpanded)[0]
 
     np.save(data_folder + '/analysis/segmentation_data.npy', sdLabelsExpanded)
-    print(">>> Final joined segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Final joined segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     imsave(data_folder + "/analysis/segmentation_mask_show.jpg", np.uint8(mark_boundaries(nuclei_img_orig, sdLabelsExpanded) * 255))
-    print(">>> Final joined segmentation result image over nuclei saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Final joined segmentation result image over nuclei saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     sdLabelsExpandedBinary = np.copy(sdLabelsExpanded)
     sdLabelsExpandedBinary[sdLabelsExpandedBinary > 0] = 1
-    imsave(data_folder + "/analysis/segmentation_binary_mask.tif", np.uint16(sdLabelsExpandedBinary * 65535))
-    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    imsave(data_folder + "/analysis/segmentation_binary_mask.tif", np.uint8(sdLabelsExpandedBinary * 255))
+    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
     del sdLabelsExpandedBinary
 
-    if (np.amax(sdLabelsExpanded) <= 65535):
+    if (np.amax(sdLabelsExpanded) <= 255):
+        imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint8(sdLabelsExpanded * 255))
+    elif (np.amax(sdLabelsExpanded) <= 65535):
         imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint16(sdLabelsExpanded * 65535))
+    else:
+        imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint32(sdLabelsExpanded * 4294967296))
 
-    return sdLabelsExpanded
+    return sdLabelsExpanded, affected_by_membrane
 
 
 #Function to calculate the marker intensities for each cell
@@ -314,8 +326,8 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
     marker_img_otsu = (marker_img - np.amin(marker_img)) / (np.amax(marker_img) - np.amin(marker_img))
     marker_img_otsu = np.uint8(marker_img_otsu * 255)
     c_otsu = threshold_multiotsu(marker_img_otsu, 3)
-    cell_binarized_threshold = ((max(0.0, c_otsu[0] - 1) / 255.0) * 65535) * bin_percentage / 100.0
-    print(">>> Marker " + marker + " binarize threshold " + str(cell_binarized_threshold) + " =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    cell_binarized_threshold = ((max(0.0, c_otsu[0] - 1) / 255.0) * pipex_img_bit_depth) * bin_percentage / 100.0
+    print(">>> Marker " + marker + " binarize threshold " + str(cell_binarized_threshold) + " =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
     markerProperties = regionprops(cellLabels, marker_img)
     #obtaining mean intensity per cell
     for cell in markerProperties:
@@ -326,7 +338,7 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
         data_table[cell.label][marker + '_ratio_pixels'] = np.count_nonzero(cell_image >= cell_binarized_threshold) / cell.area
         data_table[cell.label][marker + '_bin'] = 1 if cell.intensity_mean > cell_binarized_threshold else 0
 
-    print(">>> Marker " + marker + " calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Marker " + marker + " calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
 #Function to handle the command line parameters passed
@@ -396,7 +408,7 @@ if __name__ =='__main__':
         f.write(str(os.getpid()))
         f.close()
 
-    print(">>> Start time segmentation =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time segmentation =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     try:
         os.mkdir(data_folder + '/analysis')
@@ -468,7 +480,7 @@ if __name__ =='__main__':
                     print('>>> ', e, flush=True)
 
         #performing segmentation
-        cellLabels = cell_segmentation(nuclei_img, membrane_img)
+        cellLabels, membraneAffected = cell_segmentation(nuclei_img, membrane_img)
     else:
         try_image = False
         label_data = None
@@ -494,6 +506,7 @@ if __name__ =='__main__':
         data_cell['size'] = cell.area
         data_cell['x'] = int(cell.centroid[1])
         data_cell['y'] = int(cell.centroid[0])
+        data_cell['memref'] = int(cell.label in membraneAffected)
         data_table[cell.label] = data_cell
 
     #calculating marker intensities per cell
@@ -576,6 +589,7 @@ if __name__ =='__main__':
         binarized_marker_columns.append(marker + "_ratio_pixels")
         binarized_marker_columns.append(marker + "_bin")
     measure_markers.extend(binarized_marker_columns)
+    measure_markers.insert(0, 'memref')
     measure_markers.insert(0, 'y')
     measure_markers.insert(0, 'x')
     measure_markers.insert(0, 'size')
@@ -583,4 +597,4 @@ if __name__ =='__main__':
     df = df.reindex(measure_markers, axis=1)
     df.to_csv(data_folder + '/analysis/cell_data.csv', index=False)
 
-    print(">>> End time segmentation =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time segmentation =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

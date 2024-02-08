@@ -8,7 +8,7 @@ pandas==2.1.3
 Pillow==10.1.0
 protobuf==3.20.3
 geobuf==1.1.1
-psutil==5.9.0
+psutil==5.9.7
 PySimpleGUI==4.60.5
 qnorm==0.8.1
 scanpy==1.9.6
@@ -20,4 +20,4 @@ squidpy==1.2.0
 stardist==0.8.5
 tensorflow==2.15.0
 tifffile==2022.8.12
-TissUUmaps==3.2.0.2
+TissUUmaps==3.2.0.3

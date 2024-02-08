@@ -60,7 +60,7 @@ def data_calculations():
     if len(analysis_markers) > 0:
         markers = analysis_markers
 
-    print(">>> List of markers to analyze gathered ",markers," =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> List of markers to analyze gathered ",markers," =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     for marker in markers:
         df_norm[marker] = pd.to_numeric(df_norm[marker]).fillna(0)
@@ -86,7 +86,7 @@ def data_calculations():
     df_norm.drop(index=filter_set, axis=0, inplace=True)
 
     if cellsize_min > 0 or cellsize_max > 0 or custom_filter == 'yes':
-        print(">>> Cells filtered =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Cells filtered =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #We normalize all the markers through min-max
     for marker in markers:
@@ -98,7 +98,7 @@ def data_calculations():
             df_norm[marker] = df_norm[marker].apply(lambda x: (x - marker_min) / (marker_max - marker_min))
 
     if log_norm == 'yes' or std_norm == 'yes':
-        print(">>> Markers normalized =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Markers normalized =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Alternative normalization via z-score
     #for marker in markers:
@@ -118,13 +118,13 @@ def data_calculations():
 
         df_norm[markers] = pycombat(df_norm[markers].transpose(), batch).transpose()
 
-        print(">>> ComBat batch correction performed =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> ComBat batch correction performed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Quantile normalization
     if quantile_norm == 'yes':
         df_norm[markers] = qnorm.quantile_normalize(df_norm[markers].transpose()).transpose()
 
-        print(">>> Quantile normalization performed =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Quantile normalization performed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_norm.csv', index=False)
 
@@ -204,13 +204,13 @@ def data_calculations():
     plt.close()
 
     df_ext.to_csv(data_folder + '/analysis/downstream/cell_data_markers.csv', index=False)
-    print(">>> Markers information calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Markers information calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     del df_corr
     del df_ext
 
     fill_surface_html_template(markers, df_norm)
-    print(">>> Markers surface plot generated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Markers surface plot generated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     return df_norm, markers
 
@@ -301,30 +301,16 @@ def check_cell_type(row, cluster_id, clustering_merge_data):
     high_threshold = clustering_merge_data['scores'][cluster_id]['q75']
     low_threshold = clustering_merge_data['scores'][cluster_id]['q25']
     final_score = 0
-    num_rules = 0
-    if not pd.isnull(row['marker1']):
-        curr_marker = row['marker1']
-        curr_rule = row['rule1']
+    num_rules = 1
+    while not pd.isnull(row['marker' + str(num_rules)]):
+        curr_marker = row['marker' + str(num_rules)]
+        curr_rule = row['rule' + str(num_rules)]
         num_rules = num_rules + 1
         if curr_marker in clustering_merge_data['scores'][cluster_id]['markers']:
             curr_score = clustering_merge_data['scores'][cluster_id]['markers'][curr_marker]
             final_score = check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold)
-    if not pd.isnull(row['marker2']):
-        curr_marker = row['marker2']
-        curr_rule = row['rule2']
-        num_rules = num_rules + 1
-        if curr_marker in clustering_merge_data['scores'][cluster_id]['markers']:
-            curr_score = clustering_merge_data['scores'][cluster_id]['markers'][curr_marker]
-            final_score = final_score + check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold)
-    if not pd.isnull(row['marker3']):
-        curr_marker = row['marker3']
-        curr_rule = row['rule3']
-        num_rules = num_rules + 1
-        if curr_marker in clustering_merge_data['scores'][cluster_id]['markers']:
-            curr_score = clustering_merge_data['scores'][cluster_id]['markers'][curr_marker]
-            final_score = final_score + check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold)
     if final_score > 0:
-        return final_score / num_rules
+        return final_score / (num_rules - 1)
 
     return None
 
@@ -412,7 +398,7 @@ def refine_clustering(adata, cluster_type):
             if cell_type_prob is not None:
                 if clustering_merge_data['scores'][cluster_id]['score_dif'] < clustering_merge_data['dif_median']:
                     cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['score_dif'] / clustering_merge_data['dif_median']
-                clustering_merge_data['cell_types'][cluster_id].append({ 'cell_type' : row['cell_group'] + '.' + row['cell_type'] + '.' + row['cell_subtype'], 'prob' : cell_type_prob})
+                clustering_merge_data['cell_types'][cluster_id].append({ 'cell_type' : row['cell_group'] + '.' + row['cell_type'] + '.' + row['cell_subtype'], 'prob' : cell_type_prob, 'confidence_threshold' : row['min_confidence']})
     clustering_merge_data['candidates'] = {}
     adata.obs[cluster_type + "_ref"] = adata.obs[cluster_type].astype(str)
     adata.obs[cluster_type + "_ref_p"] = adata.obs[cluster_type].astype(str)
@@ -420,13 +406,18 @@ def refine_clustering(adata, cluster_type):
     ordered_cluster_keys.sort()
     for cluster_id in ordered_cluster_keys:
         best_candidate = None
+        best_real_confidence = 0
         for curr_cell_type in clustering_merge_data['cell_types'][cluster_id]:
+            curr_real_confidence = curr_cell_type['prob']
             curr_cell_type['prob'] = curr_cell_type['prob'] / len(clustering_merge_data['cell_types'][cluster_id])
-            if best_candidate is None or best_candidate['prob'] < curr_cell_type['prob']:
+            if (best_candidate is None or best_candidate['prob'] < curr_cell_type['prob']) and curr_real_confidence >= int(curr_cell_type['confidence_threshold']):
                 best_candidate = { 'cell_type': curr_cell_type['cell_type'], 'prob' : curr_cell_type['prob'], 'real_confidence' : '{:.1%}'.format((curr_cell_type['prob'] * len(clustering_merge_data['cell_types'][cluster_id])) / 100.0) }
-        clustering_merge_data['candidates'][cluster_id] = best_candidate
-        adata.obs.loc[adata.obs[cluster_type + "_ref"] == cluster_id, cluster_type + "_ref"] = best_candidate['cell_type']
-        adata.obs.loc[adata.obs[cluster_type + "_ref_p"] == cluster_id, cluster_type + "_ref_p"] = best_candidate['real_confidence'][:-1]
+                best_real_confidence = curr_real_confidence
+
+        if best_real_confidence > 0:
+            clustering_merge_data['candidates'][cluster_id] = best_candidate
+            adata.obs.loc[adata.obs[cluster_type + "_ref"] == cluster_id, cluster_type + "_ref"] = best_candidate['cell_type']
+            adata.obs.loc[adata.obs[cluster_type + "_ref_p"] == cluster_id, cluster_type + "_ref_p"] = best_candidate['real_confidence'][:-1]
 
     with open(data_folder + '/analysis/downstream/cell_types_result_' + cluster_type + '.json', 'w') as outfile:
         json.dump(clustering_merge_data, outfile, indent = 4)
@@ -445,7 +436,7 @@ def clustering(df_norm, markers):
     adata.obs["y"] = np.array(df_norm.loc[:, 'y'])
 
     adata.obsm["spatial"] = np.array(df_norm.loc[:, ['x', 'y']])
-    print(">>> Anndata object created =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Anndata object created =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #We take the chance to show spatially the intensities of every marker
     if batch_corr == '' and len(df_norm.index) <= max_samples:
@@ -455,20 +446,20 @@ def clustering(df_norm, markers):
             plt.clf()
             plt.close()
     else:
-        print(">>> Dataset too big to create spatial plots per marker =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Dataset too big to create spatial plots per marker =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #We calculate PCA, neighbors and UMAP for the anndata
     sc.pp.pca(adata)
     adata.obsm['X_pca'] = np.nan_to_num(adata.obsm['X_pca'], copy=False)
-    print(">>> PCA calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> PCA calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     num_neighbors = int(max(5, 15 * min(1, max_samples / len(df_norm.index))))
-    print(">>> n_neighbors set to",num_neighbors,"=", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> n_neighbors set to",num_neighbors,"=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
     sc.pp.neighbors(adata, n_neighbors=num_neighbors)
-    print(">>> Neighbors graph calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Neighbors graph calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     sc.tl.umap(adata)
-    print(">>> UMAP calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> UMAP calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
     plt.figure()
     sc.pl.umap(adata, show=False, save='_base')
     plt.clf()
@@ -482,7 +473,7 @@ def clustering(df_norm, markers):
     if (leiden == 'yes'):
         #We calculate leiden cluster
         sc.tl.leiden(adata)
-        print(">>> Leiden cluster calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+        print(">>> Leiden cluster calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
         #We print the complete leiden cluster and all related information
         calculate_cluster_info(adata, "leiden")
@@ -492,13 +483,13 @@ def clustering(df_norm, markers):
                 refine_clustering(adata, 'leiden')
                 calculate_cluster_info(adata, "leiden_ref")
             except Exception as e:
-                print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (kmeans == 'yes'):
         if (elbow == 'yes'):
             if (len(df_norm.index) <= max_samples):
                 #We calculate all kmeans clusters with k 1 to 20 so we can show the elbow method plots
-                print(">>> Performing kmeans elbow method =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Performing kmeans elbow method =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 distortions = []
                 inertias = []
                 mapping1 = {}
@@ -516,7 +507,7 @@ def clustering(df_norm, markers):
                     mapping1[k] = sum(np.min(cdist(adata.obsm['X_pca'], kmeanModel.cluster_centers_,
                                    'euclidean'), axis=1)) / adata.obsm['X_pca'].shape[0]
                     mapping2[k] = kmeanModel.inertia_
-                    print(">>> Kmeans cluster calculated with k",k," =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                    print(">>> Kmeans cluster calculated with k",k," =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 plt.figure()
                 plt.plot(K, distortions, 'bx-')
@@ -535,9 +526,9 @@ def clustering(df_norm, markers):
                 plt.savefig(data_folder + '/analysis/downstream/elbow_inertia.jpg')
                 plt.clf()
                 plt.close()
-                print(">>> Elbow method calculated =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Elbow method calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             else:
-                print(">>> Dataset too big to perform elbow method =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Dataset too big to perform elbow method =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
         #We print the complete spatial kmeans cluster and all related information. Please note that the k used is the one passad as parameter (or 10 by default)
         kmeans_cluster = KMeans(n_clusters=k_clusters, random_state=0).fit(adata.obsm['X_pca'])
@@ -551,7 +542,8 @@ def clustering(df_norm, markers):
                 refine_clustering(adata, 'kmeans')
                 calculate_cluster_info(adata, "kmeans_ref")
             except Exception as e:
-                print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+                print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                print(e,flush=True)
 
     if (leiden == 'yes' or kmeans == 'yes'):
         df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
@@ -667,7 +659,7 @@ if __name__ =='__main__':
         f.write(str(os.getpid()))
         f.close()
 
-    print(">>> Start time analysis =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time analysis =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     try:
         os.mkdir(data_folder + '/analysis/downstream')
@@ -687,4 +679,4 @@ if __name__ =='__main__':
 
     clustering(df_norm, markers)
 
-    print(">>> End time analysis =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time analysis =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

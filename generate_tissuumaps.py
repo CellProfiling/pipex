@@ -183,8 +183,8 @@ if __name__ =='__main__':
         f.write(str(os.getpid()))
         f.close()
 
-    print(">>> Start time exporting tissuumaps =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time exporting tissuumaps =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     exporting_tissuumaps()
 
-    print(">>> End time exporting tissuumaps =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time exporting tissuumaps =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

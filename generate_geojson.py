@@ -49,7 +49,7 @@ if __name__ =='__main__':
         f.write(str(os.getpid()))
         f.close()
 
-    print(">>> Start time generate_geojson =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Start time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Load segmentation data in numpy array format
     labels = np.load(data_folder + '/analysis/segmentation_data.npy')
@@ -76,7 +76,7 @@ if __name__ =='__main__':
     borders = {}
     for chaincode in chaincodes:
         borders[chaincode.objectID] = np.array(chaincode.Polygon()).tolist()
-    print(">>> Labelled regions to approximate polygons conversion finished =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> Labelled regions to approximate polygons conversion finished =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #generating geojson data to import in qupath
     GEOdata = []
@@ -119,4 +119,4 @@ if __name__ =='__main__':
     with open(data_folder + '/analysis/cell_segmentation_geo.json', 'w') as outfile:
         geojson.dump(GEOdata, outfile)
 
-    print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%H:%M:%S"), flush=True)
+    print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
