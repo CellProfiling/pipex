@@ -302,7 +302,7 @@ def check_cell_type(row, cluster_id, clustering_merge_data):
     low_threshold = clustering_merge_data['scores'][cluster_id]['q25']
     final_score = 0
     num_rules = 1
-    while not pd.isnull(row['marker' + str(num_rules)]):
+    while ('marker' + str(num_rules)) in row and not pd.isnull(row['marker' + str(num_rules)]):
         curr_marker = row['marker' + str(num_rules)]
         curr_rule = row['rule' + str(num_rules)]
         num_rules = num_rules + 1
@@ -534,6 +534,8 @@ def clustering(df_norm, markers):
         kmeans_cluster = KMeans(n_clusters=k_clusters, random_state=0).fit(adata.obsm['X_pca'])
         adata.obs['kmeans'] = kmeans_cluster.labels_.astype(str)
 
+        print(">>> Kmeans cluster calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
         #We print the complete kmeans cluster and all related information
         calculate_cluster_info(adata, "kmeans")
 
@@ -543,7 +545,6 @@ def clustering(df_norm, markers):
                 calculate_cluster_info(adata, "kmeans_ref")
             except Exception as e:
                 print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-                print(e,flush=True)
 
     if (leiden == 'yes' or kmeans == 'yes'):
         df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
