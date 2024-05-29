@@ -4,14 +4,18 @@ import datetime
 import psutil
 import shutil
 import fnmatch
+import random
 
 
 def batch_processor():
     batch_filename = './pipex_batch_list.txt'
-    python_command = 'python -u '
+    python_command = 'python -u -W ignore '
     if os.path.exists("./bin/python"):
         python_command = './bin/python -u '
     pidfile_filename = './RUNNING'
+    run_id_filename = './run_id.txt'
+    run_id_result_filename = './LAST_RUN_ID'
+    run_id = random.randint(1, 1000000)
     log_filename = './log.txt'
     if "PIPEX_DATA" not in os.environ:
         os.environ['PIPEX_DATA'] = './data'
@@ -19,9 +23,16 @@ def batch_processor():
         batch_filename = './work/pipex_batch_list.txt'
         python_command = 'python -u '
         pidfile_filename = './work/RUNNING'
+        run_id_filename = './work/run_id.txt'
+        run_id_result_filename = './work/LAST_RUN_ID'
         log_filename = './work/log.txt'
 
     print(">>> Start time pipex =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
+    if os.path.exists(run_id_filename):
+        with open(run_id_filename, 'r', encoding='utf-8') as f:
+            run_id = f.read().strip()
+            print(">>> Setting run_id =",run_id, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     swap_used = False
     batch_file = open(batch_filename, 'r')
@@ -42,6 +53,10 @@ def batch_processor():
         elif curr_command.startswith('#'):
             #comment
             continue
+        elif curr_command.startswith('run_id'):
+            #using the run_id provided by the user
+            run_id = curr_command.replace('run_id', '').strip()
+            print(">>> Setting run_id =",run_id, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         elif curr_command.startswith('swap'):
             #creating required swap via bash script 'enable_swap.sh'
             print(">>> Creating swap space =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
@@ -55,18 +70,20 @@ def batch_processor():
                 print('>>>    ' + curr_command.strip())
                 os.system(python_command + curr_command.strip())
             except Exception:
-                if curr_command.index('-data=') > 0:
-                    arg_start_index = curr_command.index('-data=') + 6
-                    end_char = ' '
-                    if curr_command[arg_start_index:arg_start_index + 1] == '\'':
-                        end_char = '\''
-                        arg_start_index = arg_start_index + 1
-                    elif curr_command[arg_start_index:arg_start_index + 1] == '\"':
-                        end_char = '\"'
-                        arg_start_index = arg_start_index + 1
-                    arg_end_index = curr_command.index(end_char, arg_start_index + 1)
-                    curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
-                    shutil.copyfile(log_filename, curr_data_folder + '/' + os.path.basename(log_filename))
+                pass
+
+            if curr_command.index('-data=') > 0:
+                arg_start_index = curr_command.index('-data=') + 6
+                end_char = ' '
+                if curr_command[arg_start_index:arg_start_index + 1] == '\'':
+                    end_char = '\''
+                    arg_start_index = arg_start_index + 1
+                elif curr_command[arg_start_index:arg_start_index + 1] == '\"':
+                    end_char = '\"'
+                    arg_start_index = arg_start_index + 1
+                arg_end_index = curr_command.index(end_char, arg_start_index + 1)
+                curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
+                shutil.copyfile(log_filename, curr_data_folder + '/' + os.path.basename(log_filename))
  
     batch_file.close()
 
@@ -84,6 +101,10 @@ def batch_processor():
     
     if os.path.exists(pidfile_filename):
         os.remove(pidfile_filename)
+
+    with open(run_id_result_filename, 'w', encoding='utf-8') as f:
+        f.write(str(run_id))
+        f.close()
 
     print(">>> End time pipex =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 

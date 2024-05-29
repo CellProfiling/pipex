@@ -430,8 +430,10 @@ def preprocess_image(f_name, numpy_img):
         tile_data = generate_tile_compensation_data(np_img, bins, tile_size)
         apply_tile_compensation(f_name, np_img, bins, tile_data, tile_size, stitch_size)
 
-    if (exposure != 1):
-        np_img = np.reshape(np.array([max(0, min(1, x * exposure)) for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
+    if (exposure != 1.0):
+        print("exposure")
+        np_img = np.reshape(np.array([(x * exposure) for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
+        np_img = np.clip(np_img, 0.0, 1.0)
     imsave(data_folder + "/preprocessed/" + f_name, np.uint16(np_img * 65535))
     print(">>> Preprocessed result image",f_name,"saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
@@ -448,6 +450,10 @@ if __name__ =='__main__':
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
+        f.close()
+    with open(data_folder + '/log_settings_preprocessing.txt', 'w+', encoding='utf-8') as f:
+        f.write(">>> Start time preprocessing = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
+        f.write(' '.join(sys.argv))
         f.close()
 
     print(">>> Start time preprocessing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
@@ -481,15 +487,21 @@ if __name__ =='__main__':
             next_try = False
             try:
                 np_img = imread(file_path)
+                if len(np_img.shape) > 2:
+                    np_img = np_img[:, :, 0]
                 preprocess_image(file, np_img)
-            except:
+            except Exception as error:
+                print(error)
                 next_try = True
 
         if next_try:
             try:
                 np_img = np.array(PIL.Image.open(file_path))
+                if len(np_img.shape) > 2:
+                    np_img = np_img[:, :, 0]
                 preprocess_image(file, np_img)
-            except:
+            except Exception as error:
+                print(error)
                 print('>>> Could not read image ' + file_path, flush=True)
 
 

@@ -307,7 +307,6 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
     sdLabelsExpandedBinary = np.copy(sdLabelsExpanded)
     sdLabelsExpandedBinary[sdLabelsExpandedBinary > 0] = 1
     imsave(data_folder + "/analysis/segmentation_binary_mask.tif", np.uint8(sdLabelsExpandedBinary * 255))
-    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
     del sdLabelsExpandedBinary
 
     if (np.amax(sdLabelsExpanded) <= 255):
@@ -316,6 +315,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
         imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint16(sdLabelsExpanded * 65535))
     else:
         imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint32(sdLabelsExpanded * 4294967296))
+    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     return sdLabelsExpanded, affected_by_membrane
 
@@ -407,6 +407,10 @@ if __name__ =='__main__':
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
         f.close()
+    with open(data_folder + '/log_settings_segmentation.txt', 'w+', encoding='utf-8') as f:
+        f.write(">>> Start time segmentation = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
+        f.write(' '.join(sys.argv))
+        f.close()
 
     print(">>> Start time segmentation =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
@@ -453,10 +457,13 @@ if __name__ =='__main__':
                 try:
                     if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
                         curr_image = imread(file_path)
-                        curr_image = curr_image[:, :, 0]
+                        if len(curr_image.shape) > 2:
+                            curr_image = curr_image[:, :, 0]
                         nuclei_img = downscale_images(curr_image)
                     if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
                         curr_image = imread(file_path)
+                        if len(curr_image.shape) > 2:
+                            curr_image = curr_image[:, :, 0]
                         curr_image = curr_image[:, :, 0]
                         membrane_img = downscale_images(curr_image)
                 except Exception as e:
@@ -467,12 +474,12 @@ if __name__ =='__main__':
                 try:
                     if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
                         curr_image = np.array(PIL.Image.open(file_path))
-                        if len(curr_image.shape) < 3:
+                        if len(curr_image.shape) > 2:
                             curr_image = curr_image[:, :, 0]
                         nuclei_img = downscale_images(curr_image)
                     if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
                         curr_image = np.array(PIL.Image.open(file_path))
-                        if len(curr_image.shape) < 3:
+                        if len(curr_image.shape) > 2:
                             curr_image = curr_image[:, :, 0]
                         membrane_img = downscale_images(curr_image)
                 except Exception as e:
@@ -484,19 +491,39 @@ if __name__ =='__main__':
     else:
         try_image = False
         label_data = None
+        membraneAffected = set()
         try:
-            cellLabels = downscale_images(np.load(custom_segmentation))
+            cellLabels = downscale_images(np.load(data_folder + '/' + custom_segmentation))
+            np.save(data_folder + '/analysis/segmentation_data.npy', cellLabels)
+            print(">>> Custom segmentation result numpy binary data saved =",
+                  datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
+            cellLabelsBinary = np.copy(cellLabels)
+            cellLabelsBinary[cellLabelsBinary > 0] = 1
+            imsave(data_folder + "/analysis/segmentation_binary_mask.tif", np.uint8(cellLabelsBinary * 255))
+            del cellLabelsBinary
+
+            if (np.amax(cellLabels) <= 255):
+                imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint8(cellLabels * 255))
+            elif (np.amax(cellLabels) <= 65535):
+                imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint16(cellLabels * 65535))
+            else:
+                imsave(data_folder + "/analysis/segmentation_mask.tif", np.uint32(cellLabels * 4294967296))
+            print(">>> Custom segmentation binary result image saved =",
+                  datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         except Exception as e:
             try_image = True
             print('>>> ', e, flush=True)
 
         if try_image:
             try:
-                cellLabels = downscale_images(np.array(PIL.Image.open(custom_segmentation)))
+                cellLabels = downscale_images(np.array(PIL.Image.open(data_folder + '/' + custom_segmentation)))
             except Exception as e:
                 print('>>> Could not custom segmentation file ' + custom_segmentation, flush=True)
                 print('>>> ', e, flush=True)
 
+    del nuclei_img
+    del membrane_img
     #creating data table with segmented cell information
     cellProperties = regionprops(cellLabels)
     data_table = {}
@@ -519,23 +546,14 @@ if __name__ =='__main__':
         try:
             with TiffFile(file_path) as tif:
                 if len(tif.series[0].pages) == 1:
-                    if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                        marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
-                    elif membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                        marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
-                    else:
-                        for marker in measure_markers:
-                            if marker + '.' in file:
-                                marker_calculation(marker, downscale_images(next(iter(tif.series[0].pages)).asarray()), cellLabels, data_table)
-                                break
+                    for marker in measure_markers:
+                        if marker + '.' in file:
+                            marker_calculation(marker, downscale_images(next(iter(tif.series[0].pages)).asarray()), cellLabels, data_table)
+                            break
                 else:
                     for page in tif.series[0].pages:
                         biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
-                        if biomarker == nuclei_marker:
-                            marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
-                        elif biomarker == membrane_marker:
-                            marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
-                        elif biomarker in measure_markers:
+                        if biomarker in measure_markers:
                             marker_calculation(biomarker, downscale_images(page.asarray()), cellLabels, data_table)
         except Exception as e:
             print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
@@ -545,36 +563,26 @@ if __name__ =='__main__':
         if next_try:
             next_try = False
             try:
-                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                    marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
-                elif membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                    marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
-                else:
-                    for marker in measure_markers:
-                        if marker + '.' in file:
-                            curr_image = imread(file_path)
-                            if len(curr_image.shape) < 3:
-                                curr_image = curr_image[:, :, 0]
-                            marker_calculation(marker, downscale_images(curr_image), cellLabels, data_table)
-                            break
+                for marker in measure_markers:
+                    if marker + '.' in file:
+                        curr_image = imread(file_path)
+                        if len(curr_image.shape) > 2:
+                            curr_image = curr_image[:, :, 0]
+                        marker_calculation(marker, downscale_images(curr_image), cellLabels, data_table)
+                        break
             except Exception as e:
                 next_try = True
                 print('>>> ', e, flush=True)
 
         if next_try:
             try:
-                if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                    marker_calculation(nuclei_marker, nuclei_img, cellLabels, data_table)
-                elif membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                    marker_calculation(membrane_marker, membrane_img, cellLabels, data_table)
-                else:
-                    for marker in measure_markers:
-                        if marker + '.' in file:
-                            curr_image = np.array(PIL.Image.open(file_path))
-                            if len(curr_image.shape) < 3:
-                                curr_image = curr_image[:, :, 0]
-                            marker_calculation(marker, downscale_images(curr_image), cellLabels, data_table)
-                            break
+                for marker in measure_markers:
+                    if marker + '.' in file:
+                        curr_image = np.array(PIL.Image.open(file_path))
+                        if len(curr_image.shape) > 2:
+                            curr_image = curr_image[:, :, 0]
+                        marker_calculation(marker, downscale_images(curr_image), cellLabels, data_table)
+                        break
             except Exception as e:
                 print('>>> Could not read image ' + file_path, flush=True)
                 print('>>> ', e, flush=True)

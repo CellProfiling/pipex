@@ -95,6 +95,8 @@ PIPEX runs sequentially a series of commands written in the file `pipex_batch_li
 
 There are currently available the following commands:
 
+- `run_id <run identifier>` : an optional command to number your current PIPEX run with an identifier. Useful if you want to integrate PIPEX in a bigger pipeline, like PyShowwwcase. **OBS**: PIPEX will assign a random run_id if you don't add this command.
+
 - `swap <number of GB>` : Linux only, it will generate a temporary swap space in the installation folder with the specified size; the space will be automatically deleted at the end of the full PIPEX process. **OBS**: it will require root permission/password while executing.
 
 - `segmentation.py` : performs PIPEX segmentation. Uses the following parameters:
@@ -254,7 +256,7 @@ If you add the `generate_geojson` command to PIPEX command list a `cell_segmenta
 
 
 TissUUmaps integration
-------------------
+----------------------
 
 If you add the `generate_tissuumaps` command to PIPEX command list a `anndata_TissUUmaps.h5ad` file will be generated in your analysis/downstream sub-folder. You can open this file in TissUUmaps. To do so:
  - Install TissUUmaps (https://tissuumaps.github.io/TissUUmaps-docs/docs/intro/installation.html)
@@ -262,6 +264,16 @@ If you add the `generate_tissuumaps` command to PIPEX command list a `anndata_Ti
 
 If you add the `include_html=yes` parameter to the `generate_tissuumaps` command, a `TissUUmaps_webexport` folder will be generated in your analysis/downstream sub-folder. You can share this file on a web server, and access it from any web browser.
 
+**NOTE**: TissUUmaps requires your images to be in `TIFF` format and be name exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
+
+
+Pipeline integration
+--------------------
+
+PIPEX can be integrated as a step in a bigger pipeline or queue. 
+ - By default, a random `run_id` is assigned to every PIPEX operations batch and a file named `LAST_RUN_ID` containing the same identifier is generated in the root folder once the process is finished.
+ - You can add a file in the root folder named `run_id.txt` containing a specific identifier if you want to force PIPEX to use it for the next run. The `LAST_RUN_ID` file will be updated accordingly when the process is finished.
+ - You can also directly specify a run identifier by the PIPEX command `run_id`
 
 
 Annex 1: Detailed segmentation explanation
@@ -403,4 +415,33 @@ PIPEX's analysis step includes an optional marker filtration commonly used in Ce
  - `CDH1` 1% top ranked intensities cell removal
  - `CTNNB1` 1% top ranked intensities cell removal
 
-Please make sure you the name of your marker column is a stric match with the aforementioned ones
+Please make sure you the name of your marker column is a strict match with the aforementioned ones
+
+
+Annex 4: Cluster refinement procedure
+-------------------------------------
+
+PIPEX's analysis step includes the possibility to refine the unsupervised clustering results (leiden and/or kmeans). This can help you with the manual annotation and merging of the clusters automatically discovered.
+
+The idea behind the cluster refinement algorithm is to explore the ranked genes associated to each cluster and try to match them with rules stated by the user. The algorithm then assigns a confidence score per cluster and rule, depending how close its ranked genes are to the rule/s definition/s. Finally, the refinement picks per cluster the annotated cluster with higher confidence (ties are solved by row order).
+
+To use the cluster refinement, you have to create a `cell_types.csv` file with rows containing the following information:
+- `cell_group`: used as a prefix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
+- `cell_type`: used as a interfix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
+- `cell_subtype`: used as a suffix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
+- `rank_filter`: used to direct the refinement procedure to use only certain ranked genes. Default is `all` (no filtering), you can use `positive_only` (use only ranked genes with positive values)
+- `min_confidence`: by default, the refinement procedure aggresively merges all clusters that minimally fullfil the indicated rules. You can force the process to be more strict by using a higher `min_confidence` probability (values from 0 to 100)
+- `marker[n]` and `rule[n]` pairs: you can add an arbritary amount (at least one!) of marker rules to guide the algorithm how to annotate/merge the automatically discovered clusters. The marker value must match one of your analysis markers and the rule states how the marker should be relatively placed amongst the ranked genes (values `high`,`medium`,`low`)
+
+Here's and example of how a `cell_types.csv` file usually looks:
+<code>
+
+    cell_group,cell_type,cell_subtype,rank_filter,min_confidence,marker1,rule1,marker2,rule2,marker3,rule3
+    artifact,fold,unknown,all,10,CBS,high,CHGA,high,AMY2B,high
+    endocrine,islet,all,positive_only,10,CHGA,high,CPEP,high,AMY2B,low
+    exocrine,acinar,unknown1,all,10,CBS,high,AMY2B,high
+    endothelial,vessels,all,positive_only,30,CD31,high,aSMA,high
+    epithelial,ductal,unknown,all,10,KRT19,high,PANCK,high
+    immune,potential,artifact,all,10,HLADR,high,NPDC1,high,aSMA,low
+
+</code>

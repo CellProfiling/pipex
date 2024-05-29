@@ -74,6 +74,10 @@ tooltip_48 = '<optional, yes or no or list of present specific markers to displa
 tooltip_49 = '<optional, yes or no to include cell segmentation as regions> : example -> yes'
 tooltip_50 = '<optional, yes or no to compress geojson regions into pbf> : example -> yes'
 tooltip_51 = '<optional, yes or no to export html page for sharing the TissUUmaps project on the web> : example -> yes'
+tooltip_52 = '<optional, dilation of shapes in pixels>: \nexample -> 0'
+tooltip_53 = '<optional, number of datapoints used for smoothing the shapes>: \nexample -> 15'
+tooltip_54 = '<optional, "none"/"hilbert"/"greedy" optimization of cutting path between shapes> : example -> none'
+tooltip_55 = '<optional, nearest neighbour heuristic distance for merging shapes>: \nexample -> 300'
 
 
 
@@ -141,6 +145,11 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Perform cluster filtering', pad=((20,0), (0,0))), sg.Checkbox('',key='-FILTERED_CLUFIL-', disabled=True, enable_events=True)],
           [sg.Text('  - Cluster column name:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='cluster_id',s=20,disabled=True, key='-FILTERED_FIELD-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_11)],
           [sg.Text('  - Cluster id(s), comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='3,4,8',s=40,disabled=True, key='-FILTERED_VALUE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_12)],
+          [sg.Text('  - LMD export', pad=((20,0), (0,0))), sg.Checkbox('',key='-FILTERED_LMD-', disabled=True, enable_events=True)],
+          [sg.Text('  - Shape dilation:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-FILTERED_LMDDIL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_52)],
+          [sg.Text('  - Shape smoothing:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='15',s=20,disabled=True, key='-FILTERED_LMDSMO-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_53)],
+          [sg.Text('  - Path optimization:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='none',s=20,disabled=True, key='-FILTERED_LMDPTH-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_54)],
+          [sg.Text('  - Distance heuristic:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='300',s=20,disabled=True, key='-FILTERED_LMDDIS-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_55)],
           [sg.Text('  - Perform tiling', pad=((20,0), (0,0))), sg.Checkbox('',key='-FILTERED_TILING-', disabled=True, enable_events=True)],
           [sg.Text('  - Tile size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='2048',s=20,disabled=True, key='-FILTERED_TILSIZ-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_13)],
           [sg.Text('  - Tile overlap, in pixels:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-FILTERED_TILOVE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_14)],
@@ -252,6 +261,11 @@ while True:
     if event == '-FILTERED-':
         window['-FILTERED_CLUFIL-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_FIELD-'].update(disabled=(not values['-FILTERED-']))
+        window['-FILTERED_LMD-'].update(disabled=(not values['-FILTERED-']))
+        window['-FILTERED_LMDDIL-'].update(disabled=(not values['-FILTERED-']))
+        window['-FILTERED_LMDSMO-'].update(disabled=(not values['-FILTERED-']))
+        window['-FILTERED_LMDPTH-'].update(disabled=(not values['-FILTERED-']))
+        window['-FILTERED_LMDDIS-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_VALUE-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_TILING-'].update(disabled=(not values['-FILTERED-']))
         window['-FILTERED_TILSIZ-'].update(disabled=(not values['-FILTERED-']))
@@ -262,6 +276,10 @@ while True:
         if (values['-FILTERED-']):
             window['-FILTERED_FIELD-'].update(disabled=(not values['-FILTERED_CLUFIL-']))
             window['-FILTERED_VALUE-'].update(disabled=(not values['-FILTERED_CLUFIL-']))
+            window['-FILTERED_LMDDIL-'].update(disabled=(not values['-FILTERED_LMD-']))
+            window['-FILTERED_LMDSMO-'].update(disabled=(not values['-FILTERED_LMD-']))
+            window['-FILTERED_LMDPTH-'].update(disabled=(not values['-FILTERED_LMD-']))
+            window['-FILTERED_LMDDIS-'].update(disabled=(not values['-FILTERED_LMD-']))
             window['-FILTERED_TILSIZ-'].update(disabled=(not values['-FILTERED_TILING-']))
             window['-FILTERED_TILOVE-'].update(disabled=(not values['-FILTERED_TILING-']))
             window['-FILTERED_TILPER-'].update(disabled=(not values['-FILTERED_TILING-']))
@@ -270,6 +288,11 @@ while True:
     if event == '-FILTERED_CLUFIL-':
         window['-FILTERED_FIELD-'].update(disabled=(not values['-FILTERED_CLUFIL-']))
         window['-FILTERED_VALUE-'].update(disabled=(not values['-FILTERED_CLUFIL-']))
+    if event == '-FILTERED_LMD-':
+        window['-FILTERED_LMDDIL-'].update(disabled=(not values['-FILTERED_LMD-']))
+        window['-FILTERED_LMDSMO-'].update(disabled=(not values['-FILTERED_LMD-']))
+        window['-FILTERED_LMDPTH-'].update(disabled=(not values['-FILTERED_LMD-']))
+        window['-FILTERED_LMDDIS-'].update(disabled=(not values['-FILTERED_LMD-']))
     if event == '-FILTERED_TILING-':
         window['-FILTERED_TILSIZ-'].update(disabled=(not values['-FILTERED_TILING-']))
         window['-FILTERED_TILOVE-'].update(disabled=(not values['-FILTERED_TILING-']))
@@ -389,6 +412,13 @@ if values['-FILTERED-']:
         batch_list = (batch_list +
             ' -field=' + values['-FILTERED_FIELD-'] +
             ' -values=' + values['-FILTERED_VALUE-'])
+    if (values['-FILTERED_LMD-']):
+        batch_list = (batch_list +
+            ' -lmd=yes' +
+            ' -shape_dilation=' + values['-FILTERED_LMDDIL-'] +
+            ' -convolution_smoothing=' + values['-FILTERED_LMDSMO-'] +
+            ' -path_optimization=' + values['-FILTERED_LMDPTH-'] +
+            ' -distance_heuristic=' + values['-FILTERED_LMDDIS-'])
     if (values['-FILTERED_TILING-']):
         batch_list = (batch_list +
             ' -tile_size=' + values['-FILTERED_TILSIZ-'] +

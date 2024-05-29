@@ -47,14 +47,7 @@ def data_calculations():
     #Getting the list of marker names
     markers = list(df_norm.columns.values)
     markers = markers[(df_norm.columns.get_loc("y") + 1):]
-    #saveguard if analysis.py has been executed before and cluster_id + cluster_color already exists
-    if any("_bin_thres" in s for s in markers):
-        markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc(list(filter(lambda x: '_bin_thres' in x, markers))[0]))]
-    else:
-        if 'leiden' in markers:
-            markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc("leiden"))]
-        elif 'kmeans' in markers:
-            markers = markers[:-(len(df_norm.columns) - df_norm.columns.get_loc("kmeans"))]
+    markers = [x for x in markers if "memref" not in x and "_bin" not in x and "_ratio_pixels" not in x and "_local_90" not in x and "leiden" not in x and "kmeans" not in x and "_ref" not in x]
 
     #If a specific list of markers is informed, we use it
     if len(analysis_markers) > 0:
@@ -278,29 +271,34 @@ def generate_leiden_color(leiden_id, leiden_color_list):
         return ''
 
 
-def check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold):
+def check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold, rank_filter):
     if curr_rule == 'high':
         if curr_score >= high_threshold:
-            return 100
+            return 100, "high"
         elif curr_score > low_threshold:
-            return 50
+            return 50, "medium"
     elif curr_rule == 'low':
         if curr_score <= low_threshold:
-            return 100
+            if rank_filter == "all" or curr_score >= 0:
+                return 100, "low"
         elif curr_score < high_threshold:
-            return 50
+            return 50, "medium"
     else:
         if curr_score > low_threshold and curr_score < high_threshold:
-            return 100
+            return 100, "medium"
+        elif curr_score >= high_threshold:
+            return 50, "high"
         else:
-            return 50
-    return 0
+            if rank_filter == "all" or curr_score >= 0:
+                return 50, "low"
+    return 0, "none"
 
 
-def check_cell_type(row, cluster_id, clustering_merge_data):
-    high_threshold = clustering_merge_data['scores'][cluster_id]['q75']
-    low_threshold = clustering_merge_data['scores'][cluster_id]['q25']
+def check_cell_type(row, cluster_id, clustering_merge_data, rank_filter):
+    high_threshold = clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['q75'] if rank_filter == "positive_only" else clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['q75']
+    low_threshold = clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['q25'] if rank_filter == "positive_only" else clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['q25']
     final_score = 0
+    rule_match = {}
     num_rules = 1
     while ('marker' + str(num_rules)) in row and not pd.isnull(row['marker' + str(num_rules)]):
         curr_marker = row['marker' + str(num_rules)]
@@ -308,11 +306,12 @@ def check_cell_type(row, cluster_id, clustering_merge_data):
         num_rules = num_rules + 1
         if curr_marker in clustering_merge_data['scores'][cluster_id]['markers']:
             curr_score = clustering_merge_data['scores'][cluster_id]['markers'][curr_marker]
-            final_score = check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold)
+            final_score, marker_level = check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold, rank_filter)
+            rule_match[curr_marker] = marker_level
     if final_score > 0:
-        return final_score / (num_rules - 1)
+        return final_score / (num_rules - 1), rule_match
 
-    return None
+    return None, None
 
 
 def calculate_cluster_info(adata, cluster_type):
@@ -371,7 +370,8 @@ def refine_clustering(adata, cluster_type):
     clustering_merge_data = {}
     clustering_merge_data['scores'] = {}
     clustering_merge_data['cell_types'] = {}
-    cluster_dif_list = []
+    cluster_dif_list_all = []
+    cluster_dif_list_positive = []
     for cluster_id in adata.obs[cluster_type].unique():
         cluster_score_list = []
         cluster_merge_clusters_scores = {}
@@ -381,24 +381,60 @@ def refine_clustering(adata, cluster_type):
             curr_score = rank_df[rank_df['names'] == marker_id]['scores'].values[0]
             cluster_merge_clusters_scores['markers'][marker_id] = float(curr_score)
             cluster_score_list.append(curr_score)
-        cluster_merge_clusters_scores['score_max'] = float(max(cluster_score_list))
-        cluster_merge_clusters_scores['score_min'] = float(min(cluster_score_list))
-        cluster_merge_clusters_scores['score_dif'] = cluster_merge_clusters_scores['score_max'] - cluster_merge_clusters_scores['score_min']
-        cluster_dif_list.append(cluster_merge_clusters_scores['score_dif'])
-        cluster_merge_clusters_scores['q75'] = float((cluster_merge_clusters_scores['score_max'] - cluster_merge_clusters_scores['score_min']) * 75 / 100 + cluster_merge_clusters_scores['score_min'])
-        cluster_merge_clusters_scores['q25'] = float((cluster_merge_clusters_scores['score_max'] - cluster_merge_clusters_scores['score_min']) * 25 / 100 + cluster_merge_clusters_scores['score_min'])
+
+        cluster_merge_clusters_scores['rank_filter'] = {}
+
+        cluster_merge_clusters_scores['rank_filter']['all'] = {}
+        cluster_merge_clusters_scores['rank_filter']['all']['score_max'] = float(max(cluster_score_list))
+        cluster_merge_clusters_scores['rank_filter']['all']['score_min'] = float(min(cluster_score_list))
+        cluster_merge_clusters_scores['rank_filter']['all']['score_dif'] = cluster_merge_clusters_scores['rank_filter']['all']['score_max'] - cluster_merge_clusters_scores['rank_filter']['all']['score_min']
+        cluster_dif_list_all.append(cluster_merge_clusters_scores['rank_filter']['all']['score_dif'])
+        cluster_merge_clusters_scores['rank_filter']['all']['q75'] = float((cluster_merge_clusters_scores['rank_filter']['all']['score_max'] - cluster_merge_clusters_scores['rank_filter']['all']['score_min']) * 75 / 100 + cluster_merge_clusters_scores['rank_filter']['all']['score_min'])
+        cluster_merge_clusters_scores['rank_filter']['all']['q25'] = float((cluster_merge_clusters_scores['rank_filter']['all']['score_max'] - cluster_merge_clusters_scores['rank_filter']['all']['score_min']) * 25 / 100 + cluster_merge_clusters_scores['rank_filter']['all']['score_min'])
+
+        cluster_score_list_positive = list(filter(lambda x: x >= 0, cluster_score_list))
+        if len(cluster_score_list_positive) > 0:
+            cluster_merge_clusters_scores['rank_filter']['positive_only'] = {}
+            cluster_merge_clusters_scores['rank_filter']['positive_only']['score_max'] = float(max(cluster_score_list_positive))
+            cluster_merge_clusters_scores['rank_filter']['positive_only']['score_min'] = float(min(cluster_score_list_positive))
+            cluster_merge_clusters_scores['rank_filter']['positive_only']['score_dif'] = cluster_merge_clusters_scores['rank_filter']['positive_only']['score_max'] - cluster_merge_clusters_scores['rank_filter']['positive_only']['score_min']
+            cluster_dif_list_positive.append(cluster_merge_clusters_scores['rank_filter']['positive_only']['score_dif'])
+            cluster_merge_clusters_scores['rank_filter']['positive_only']['q75'] = float((cluster_merge_clusters_scores['rank_filter']['positive_only']['score_max'] - cluster_merge_clusters_scores['rank_filter']['positive_only']['score_min']) * 75 / 100 + cluster_merge_clusters_scores['rank_filter']['positive_only']['score_min'])
+            cluster_merge_clusters_scores['rank_filter']['positive_only']['q25'] = float((cluster_merge_clusters_scores['rank_filter']['positive_only']['score_max'] - cluster_merge_clusters_scores['rank_filter']['positive_only']['score_min']) * 25 / 100 + cluster_merge_clusters_scores['rank_filter']['positive_only']['score_min'])
+
         clustering_merge_data['scores'][cluster_id] = cluster_merge_clusters_scores
         clustering_merge_data['cell_types'][cluster_id] = []
-    clustering_merge_data['dif_median'] = float(statistics.median(cluster_dif_list))
+    clustering_merge_data['dif_median_all'] = float(statistics.median(cluster_dif_list_all))
+    if len(cluster_dif_list_positive) > 0:
+        clustering_merge_data['dif_median_positive'] = float(statistics.median(cluster_dif_list_positive))
 
     cell_types = pd.read_csv(data_folder + '/cell_types.csv')
     for index, row in cell_types.iterrows():
         for cluster_id in clustering_merge_data['scores']:
-            cell_type_prob = check_cell_type(row, cluster_id, clustering_merge_data)
-            if cell_type_prob is not None:
-                if clustering_merge_data['scores'][cluster_id]['score_dif'] < clustering_merge_data['dif_median']:
-                    cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['score_dif'] / clustering_merge_data['dif_median']
-                clustering_merge_data['cell_types'][cluster_id].append({ 'cell_type' : row['cell_group'] + '.' + row['cell_type'] + '.' + row['cell_subtype'], 'prob' : cell_type_prob, 'confidence_threshold' : row['min_confidence']})
+            if row['rank_filter'] != "positive_only" or "positive_only" in clustering_merge_data['scores'][cluster_id]['rank_filter']:
+                cell_type_prob, marker_ranks = check_cell_type(row, cluster_id, clustering_merge_data, row['rank_filter'])
+                if cell_type_prob is not None:
+                    curr_final_merging_data = {'cell_type': row['cell_group'] + '.' + row['cell_type'] + '.' + row['cell_subtype'], 'prob': cell_type_prob, 'rank_filter': row['rank_filter'], 'confidence_threshold': row['min_confidence']}
+                    if row['rank_filter'] == "positive_only":
+                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif']) + " / " + str(clustering_merge_data['dif_median_positive'])
+                        cluster_marker_ranks = ""
+                        for curr_marker_rank in marker_ranks:
+                            cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
+                        curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
+                        if clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] < clustering_merge_data['dif_median_positive']:
+                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] / clustering_merge_data['dif_median_positive']
+                            curr_final_merging_data['prob'] = cell_type_prob
+                        clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
+                    else:
+                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif']) + " / " + str(clustering_merge_data['dif_median_all'])
+                        cluster_marker_ranks = ""
+                        for curr_marker_rank in marker_ranks:
+                            cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
+                        curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
+                        if clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] < clustering_merge_data['dif_median_all']:
+                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] / clustering_merge_data['dif_median_all']
+                            curr_final_merging_data['prob'] = cell_type_prob
+                        clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
     clustering_merge_data['candidates'] = {}
     adata.obs[cluster_type + "_ref"] = adata.obs[cluster_type].astype(str)
     adata.obs[cluster_type + "_ref_p"] = adata.obs[cluster_type].astype(str)
@@ -465,11 +501,6 @@ def clustering(df_norm, markers):
     plt.clf()
     plt.close()
 
-    #standard_embedding = umap.UMAP(random_state=0,low_memory=True).fit_transform(adata.obsm['X_pca'])
-    #plt.scatter(standard_embedding[:, 0], standard_embedding[:, 1], s=0.1, cmap='Spectral');
-    #plt.savefig('umaptest.jpg')
-    #sys.exit(0)
-
     if (leiden == 'yes'):
         #We calculate leiden cluster
         sc.tl.leiden(adata)
@@ -483,6 +514,7 @@ def clustering(df_norm, markers):
                 refine_clustering(adata, 'leiden')
                 calculate_cluster_info(adata, "leiden_ref")
             except Exception as e:
+                print(e)
                 print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (kmeans == 'yes'):
@@ -544,6 +576,7 @@ def clustering(df_norm, markers):
                 refine_clustering(adata, 'kmeans')
                 calculate_cluster_info(adata, "kmeans_ref")
             except Exception as e:
+                print(e)
                 print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (leiden == 'yes' or kmeans == 'yes'):
@@ -658,6 +691,10 @@ if __name__ =='__main__':
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
+        f.close()
+    with open(data_folder + '/log_settings_analysis.txt', 'w+', encoding='utf-8') as f:
+        f.write(">>> Start time analysis = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
+        f.write(' '.join(sys.argv))
         f.close()
 
     print(">>> Start time analysis =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
