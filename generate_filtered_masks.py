@@ -6,7 +6,9 @@ import pandas as pd
 import numpy as np
 from skimage.io import imsave
 from skimage.segmentation import relabel_sequential
-from lmd.lib import SegmentationLoader, Collection
+from lmd.lib import SegmentationLoader
+import cv2
+
 
 data_folder = os.environ.get('PIPEX_DATA')
 field = ""
@@ -111,9 +113,8 @@ if __name__ =='__main__':
 
     if (field != "" and values != ""):
         value_array = values.split(",")
-        value_array = [int(i) for i in value_array]
 
-        df_filtered = df[df[field].isin(value_array)]
+        df_filtered = df[df[field].astype(str).isin(value_array)]
         label_list = df_filtered['cell_id'].tolist()
 
         ix = np.in1d(labels.ravel(), label_list).reshape(labels.shape)
@@ -135,7 +136,26 @@ if __name__ =='__main__':
         _1, top_left_point = closest_cell(df, df['x'].quantile(.25), df['y'].quantile(.25))
         _2, top_right_point = closest_cell(df, df['x'].quantile(.75), df['y'].quantile(.25))
         _3, bottom_right_point = closest_cell(df, df['x'].quantile(.75), df['y'].quantile(.75))
-        print(">>> LMD calibration cell/points",_1,"-",top_left_point,",",_2,"-",top_right_point,",",_3,"-",bottom_right_point,"chosen =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        print(">>> LMD calibration cell/points: cell_id",int(_1),"-",top_left_point,", cell_id",int(_2),"-",top_right_point,", cell_id",int(_3),"-",bottom_right_point,"chosen =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
+        cells = np.load(data_folder + '/analysis/segmentation_data.npy')
+        ix = np.in1d(cells.ravel(), [_1,_2,_3]).reshape(cells.shape)
+        cells = np.where(ix, cells, 0)
+        cells[cells > 0] = 1
+
+        overlay_img = np.zeros((len(cells), len(cells[0]), 4), np.uint8)
+        overlay_img[:,:,0] = np.where(cells > 0, 255, 0)
+        overlay_img[:,:,1] = np.where(cells > 0, 255, 0)
+        overlay_img[:,:,3] = np.where(cells > 0, 32, 0)
+        overlay_img = cv2.line(overlay_img, (int(top_left_point[1]), int(max(0, top_left_point[0] - 10))), (int(top_left_point[1]), int(min(len(cells), top_left_point[0] + 10))), (0, 0, 255, 255), 1)
+        overlay_img = cv2.line(overlay_img, (int(max(0, top_left_point[1] - 10)), int(top_left_point[0])), (int(min(len(cells[0]), top_left_point[1] + 10)), int(top_left_point[0])), (0, 0, 255, 255), 1)
+        overlay_img = cv2.line(overlay_img, (int(top_right_point[1]), int(max(0, top_right_point[0] - 10))), (int(top_right_point[1]), int(min(len(cells), top_right_point[0] + 10))), (0, 0, 255, 255), 1)
+        overlay_img = cv2.line(overlay_img, (int(max(0, top_right_point[1] - 10)), int(top_right_point[0])), (int(min(len(cells[0]), top_right_point[1] + 10)), int(top_right_point[0])), (0, 0, 255, 255), 1)
+        overlay_img = cv2.line(overlay_img, (int(bottom_right_point[1]), int(max(0, bottom_right_point[0] - 10))), (int(bottom_right_point[1]), int(min(len(cells), bottom_right_point[0] + 10))), (0, 0, 255, 255), 1)
+        overlay_img = cv2.line(overlay_img, (int(max(0, bottom_right_point[1] - 10)), int(bottom_right_point[0])), (int(min(len(cells[0]), bottom_right_point[1] + 10)), int(bottom_right_point[0])), (0, 0, 255, 255), 1)
+        cv2.imwrite(data_folder + "/analysis/lmd_calibration_points_overlay.png", overlay_img)
+        print(">>> LMD calibration points transparent image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
         calibration_points = np.array([top_left_point, top_right_point, bottom_right_point])
         loader_config = { 'orientation_transform': np.array([[0, -1], [1, 0]]),
                          'shape_dilation': shape_dilation,
@@ -147,9 +167,8 @@ if __name__ =='__main__':
         if (field != "" and values != ""):
             cell_sets = []
             value_array = values.split(",")
-            value_array = [int(i) for i in value_array]
             for i in value_array:
-                df_group = df_filtered[df_filtered[field] == i]
+                df_group = df_filtered[df_filtered[field].astype(str) == i]
                 label_group = list(filter(np.unique(labels).__contains__, df_group['cell_id'].tolist()))
                 cell_sets = [{"classes": np.unique(label_group), "well": "A" + str(i)}]
                 shape_collection = sl(labels, cell_sets, calibration_points)

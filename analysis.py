@@ -1,5 +1,7 @@
 import sys
 import os
+from collections import OrderedDict
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import datetime
 import numpy as np
@@ -126,7 +128,7 @@ def data_calculations():
     df_corr = df_corr[markers].corr()
 
     plt.figure()
-    fig1, ax1 = plt.subplots(figsize=(7,5))
+    fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
     sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
     plt.savefig(data_folder + '/analysis/downstream/correlation_heatmap.jpg')
     plt.clf()
@@ -134,7 +136,7 @@ def data_calculations():
 
     #We calculate and plot the dendogram of the correlations clustermap
     plt.figure()
-    sns_clustermap = sns.clustermap(df_corr, figsize=(7,5))
+    sns_clustermap = sns.clustermap(df_corr, figsize=(image_size / 100,image_size / 140))
     plt.savefig(data_folder + '/analysis/downstream/correlation_dendogram.jpg')
     plt.clf()
     plt.close()
@@ -187,7 +189,7 @@ def data_calculations():
 
     #We generate a boxplot with each marker. Note: this shows calculations with cells expressing the marker and ignoring the other that don't
     plt.figure()
-    fig2, ax2 = plt.subplots(figsize=(7,5))
+    fig2, ax2 = plt.subplots(figsize=(image_size / 100,image_size / 140))
     sns_boxplot = sns.boxplot(x = "variable", y = "value", data = pd.melt(df_norm[markers]), showfliers = False, color="skyblue")
     sns_boxplot.set_xticklabels(sns_boxplot.get_xticklabels(), rotation = 45)
     sns_boxplot.set(xlabel=None)
@@ -277,21 +279,25 @@ def check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold
             return 100, "high"
         elif curr_score > low_threshold:
             return 50, "medium"
+        else:
+            return 0, "low"
     elif curr_rule == 'low':
         if curr_score <= low_threshold:
-            if rank_filter == "all" or curr_score >= 0:
+            if rank_filter != "positive_only" or curr_score >= 0:
                 return 100, "low"
+            else:
+                return 0, "low"
         elif curr_score < high_threshold:
             return 50, "medium"
+        else:
+            return 0, "high"
     else:
         if curr_score > low_threshold and curr_score < high_threshold:
             return 100, "medium"
         elif curr_score >= high_threshold:
             return 50, "high"
         else:
-            if rank_filter == "all" or curr_score >= 0:
-                return 50, "low"
-    return 0, "none"
+            return 50, "low"
 
 
 def check_cell_type(row, cluster_id, clustering_merge_data, rank_filter):
@@ -308,6 +314,8 @@ def check_cell_type(row, cluster_id, clustering_merge_data, rank_filter):
             curr_score = clustering_merge_data['scores'][cluster_id]['markers'][curr_marker]
             final_score, marker_level = check_cell_type_threshold(curr_marker, curr_rule, curr_score, high_threshold, low_threshold, rank_filter)
             rule_match[curr_marker] = marker_level
+        elif rank_filter != "none":
+            return None, None
     if final_score > 0:
         return final_score / (num_rules - 1), rule_match
 
@@ -349,7 +357,7 @@ def calculate_cluster_info(adata, cluster_type):
 
     try:
         sc.tl.rank_genes_groups(adata, cluster_type, method='t-test')
-        sc.settings.set_figure_params(format='jpg', figsize=(image_size / 200, image_size / 200))
+        sc.settings.set_figure_params(format='jpg', figsize=(image_size / 100, image_size / 100))
         plt.figure()
         sc.pl.rank_genes_groups(adata, n_genes=len(markers), sharey=False, show=False, save='')
         plt.clf()
@@ -404,9 +412,9 @@ def refine_clustering(adata, cluster_type):
 
         clustering_merge_data['scores'][cluster_id] = cluster_merge_clusters_scores
         clustering_merge_data['cell_types'][cluster_id] = []
-    clustering_merge_data['dif_median_all'] = float(statistics.median(cluster_dif_list_all))
-    if len(cluster_dif_list_positive) > 0:
-        clustering_merge_data['dif_median_positive'] = float(statistics.median(cluster_dif_list_positive))
+#    clustering_merge_data['dif_median_all'] = float(statistics.median(cluster_dif_list_all))
+#    if len(cluster_dif_list_positive) > 0:
+#        clustering_merge_data['dif_median_positive'] = float(statistics.median(cluster_dif_list_positive))
 
     cell_types = pd.read_csv(data_folder + '/cell_types.csv')
     for index, row in cell_types.iterrows():
@@ -415,26 +423,27 @@ def refine_clustering(adata, cluster_type):
                 cell_type_prob, marker_ranks = check_cell_type(row, cluster_id, clustering_merge_data, row['rank_filter'])
                 if cell_type_prob is not None:
                     curr_final_merging_data = {'cell_type': row['cell_group'] + '.' + row['cell_type'] + '.' + row['cell_subtype'], 'prob': cell_type_prob, 'rank_filter': row['rank_filter'], 'confidence_threshold': row['min_confidence']}
-                    if row['rank_filter'] == "positive_only":
-                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif']) + " / " + str(clustering_merge_data['dif_median_positive'])
-                        cluster_marker_ranks = ""
-                        for curr_marker_rank in marker_ranks:
-                            cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
-                        curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
-                        if clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] < clustering_merge_data['dif_median_positive']:
-                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] / clustering_merge_data['dif_median_positive']
-                            curr_final_merging_data['prob'] = cell_type_prob
-                        clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
-                    else:
-                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif']) + " / " + str(clustering_merge_data['dif_median_all'])
-                        cluster_marker_ranks = ""
-                        for curr_marker_rank in marker_ranks:
-                            cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
-                        curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
-                        if clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] < clustering_merge_data['dif_median_all']:
-                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] / clustering_merge_data['dif_median_all']
-                            curr_final_merging_data['prob'] = cell_type_prob
-                        clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
+#                    if row['rank_filter'] == "positive_only":
+#                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif']) + " / " + str(clustering_merge_data['dif_median_positive'])
+#                        cluster_marker_ranks = ""
+#                        for curr_marker_rank in marker_ranks:
+#                            cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
+#                        curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
+#                        if clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] < clustering_merge_data['dif_median_positive']:
+#                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] / clustering_merge_data['dif_median_positive']
+#                            curr_final_merging_data['prob'] = cell_type_prob
+#                        clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
+#                    else:
+#                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif']) + " / " + str(clustering_merge_data['dif_median_all'])
+                    cluster_marker_ranks = ""
+                    for curr_marker_rank in marker_ranks:
+                        cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
+                    curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
+#                       if clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] < clustering_merge_data['dif_median_all']:
+#                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] / clustering_merge_data['dif_median_all']
+#                            curr_final_merging_data['prob'] = cell_type_prob
+                    clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
+
     clustering_merge_data['candidates'] = {}
     adata.obs[cluster_type + "_ref"] = adata.obs[cluster_type].astype(str)
     adata.obs[cluster_type + "_ref_p"] = adata.obs[cluster_type].astype(str)
@@ -444,17 +453,18 @@ def refine_clustering(adata, cluster_type):
         best_candidate = None
         best_real_confidence = 0
         for curr_cell_type in clustering_merge_data['cell_types'][cluster_id]:
-            curr_real_confidence = curr_cell_type['prob']
-            curr_cell_type['prob'] = curr_cell_type['prob'] / len(clustering_merge_data['cell_types'][cluster_id])
-            if (best_candidate is None or best_candidate['prob'] < curr_cell_type['prob']) and curr_real_confidence >= int(curr_cell_type['confidence_threshold']):
-                best_candidate = { 'cell_type': curr_cell_type['cell_type'], 'prob' : curr_cell_type['prob'], 'real_confidence' : '{:.1%}'.format((curr_cell_type['prob'] * len(clustering_merge_data['cell_types'][cluster_id])) / 100.0) }
-                best_real_confidence = curr_real_confidence
+            if (best_candidate is None or best_candidate['prob'] < curr_cell_type['prob']) and curr_cell_type['prob'] >= int(curr_cell_type['confidence_threshold']):
+                best_candidate = { 'cell_type': curr_cell_type['cell_type'], 'prob' : curr_cell_type['prob'] } #, 'real_confidence' : '{:.1%}'.format(curr_cell_type['prob'])} # * len(clustering_merge_data['cell_types'][cluster_id])) / 100.0) }
+                best_real_confidence = curr_cell_type['prob']
 
         if best_real_confidence > 0:
             clustering_merge_data['candidates'][cluster_id] = best_candidate
             adata.obs.loc[adata.obs[cluster_type + "_ref"] == cluster_id, cluster_type + "_ref"] = best_candidate['cell_type']
-            adata.obs.loc[adata.obs[cluster_type + "_ref_p"] == cluster_id, cluster_type + "_ref_p"] = best_candidate['real_confidence'][:-1]
+            adata.obs.loc[adata.obs[cluster_type + "_ref_p"] == cluster_id, cluster_type + "_ref_p"] = '{:.1%}'.format(best_candidate['prob']) #best_candidate['real_confidence'][:-1]
 
+    clustering_merge_data["scores"] = OrderedDict(sorted(clustering_merge_data["scores"].items()))
+    clustering_merge_data["cell_types"] = OrderedDict(sorted(clustering_merge_data["cell_types"].items()))
+    clustering_merge_data["candidates"] = OrderedDict(sorted(clustering_merge_data["candidates"].items()))
     with open(data_folder + '/analysis/downstream/cell_types_result_' + cluster_type + '.json', 'w') as outfile:
         json.dump(clustering_merge_data, outfile, indent = 4)
 
@@ -462,7 +472,10 @@ def refine_clustering(adata, cluster_type):
 #Function to perform different cluster methods
 def clustering(df_norm, markers):
     #We create an anndata object with the data so we can proceed with the clustering analysis using scanpy and squidpy libraries
-    adata = sc.AnnData(df_norm.loc[:, markers])
+    if use_bin == 'yes':
+        adata = sc.AnnData(df_norm.loc[:, [marker + '_bin' for marker in markers]])
+    else:
+        adata = sc.AnnData(df_norm.loc[:, markers])
     adata.obs_names = 'cell_id_' + df_norm['cell_id'].astype(str)
     adata.var_names = markers
 
@@ -584,33 +597,55 @@ def clustering(df_norm, markers):
         if (leiden == 'yes'):
             df['leiden'] = df['cell_id'].map(adata.obs.set_index('id')['leiden']).astype(str)
             df['leiden'] = df['leiden'].fillna('')
-            if refine_clusters == "yes":
-                df['leiden_ref'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref']).astype(str)
-                df['leiden_ref'] = df['leiden_ref'].fillna('')
-                df['leiden_ref_p'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref_p']).astype(str)
-                df['leiden_ref_p'] = df['leiden_ref_p'].fillna('')
             leiden_color_list = adata.uns['leiden_colors']
             df['leiden_color'] = df.apply(lambda row: generate_leiden_color(row['leiden'], leiden_color_list), axis=1)
+            if refine_clusters == "yes":
+                df['leiden_ref'] = df['leiden']
+                df['leiden_ref'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref']).astype(str)
+                df['leiden_ref_p'] = 0
+                df['leiden_ref_p'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref_p']).astype(str)
+                df['leiden_ref_color'] = df['leiden_color']
+                for kmeans_ref_id in adata.obs['leiden_ref'].unique():
+                    df.loc[df['leiden_ref'] == kmeans_ref_id, "leiden_ref_color"] = df.loc[df['leiden_ref'] == kmeans_ref_id, "leiden_ref_color"].values[0]
             df_norm['leiden'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden']).astype(str)
             df_norm['leiden_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden_color']).astype(str)
+
+            if use_bin == 'yes':
+                df_corr = pd.concat([df[[marker + '_bin' for marker in markers]], pd.get_dummies(df_norm['leiden'], prefix='clusterL')],axis=1).corr()
+            else:
+                df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['leiden'], prefix='clusterL')], axis=1).corr()
+
+            plt.figure()
+            fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
+            sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
+            plt.savefig(data_folder + '/analysis/downstream/leiden_clusters_correlation_heatmap.jpg')
+            plt.clf()
+            plt.close()
+
         if (kmeans == 'yes'):
             #We add to the original cell segmentation csv file the calculated kmeans group for each cell
             df['kmeans'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans']).astype(str)
             df['kmeans'] = df['kmeans'].fillna('')
-            if refine_clusters == "yes":
-                df['kmeans_ref'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref']).astype(str)
-                df['kmeans_ref'] = df['kmeans_ref'].fillna('')
-                df['kmeans_ref_p'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref_p']).astype(str)
-                df['kmeans_ref_p'] = df['kmeans_ref_p'].fillna('')
             kmeans_color_list = adata.uns['kmeans_colors']
             df['kmeans_color'] = df.apply(lambda row: generate_leiden_color(row['kmeans'], kmeans_color_list), axis=1)
+            if refine_clusters == "yes":
+                df['kmeans_ref'] = df['kmeans']
+                df['kmeans_ref'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref']).astype(str)
+                df['kmeans_ref_p'] = 0
+                df['kmeans_ref_p'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref_p']).astype(str)
+                df['kmeans_ref_color'] = df['kmeans_color']
+                for kmeans_ref_id in adata.obs['kmeans_ref'].unique():
+                    df.loc[df['kmeans_ref'] == kmeans_ref_id, "kmeans_ref_color"] = df.loc[df['kmeans_ref'] == kmeans_ref_id, "kmeans_ref_color"].values[0]
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
             df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
 
-            df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
+            if use_bin == 'yes':
+                df_corr = pd.concat([df[[marker + '_bin' for marker in markers]], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')],axis=1).corr()
+            else:
+                df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
 
             plt.figure()
-            fig1, ax1 = plt.subplots(figsize=(7,5))
+            fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
             sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
             plt.savefig(data_folder + '/analysis/downstream/kmeans_clusters_correlation_heatmap.jpg')
             plt.clf()
@@ -711,9 +746,6 @@ if __name__ =='__main__':
     sns.set(font_scale=0.6)
 
     df_norm, markers = data_calculations()
-
-    if use_bin == 'yes':
-        markers = [marker + '_bin' for marker in markers]
 
     clustering(df_norm, markers)
 

@@ -36,7 +36,7 @@ def exporting_tissuumaps ():
     elif include_marker_images == "no":
         markers = []
     else:
-        markers = [v for v in adata.var_names if v in include_marker_images.split(",")]
+        markers = include_marker_images.split(",")
     if include_geojson == "yes" and include_marker_images != "no":
         if compress_geojson == "yes":
             import geobuf

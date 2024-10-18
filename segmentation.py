@@ -186,7 +186,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig):
                 tile_x = tile_row * watershed_tile_size
                 tile_y = tile_column * watershed_tile_size
                 tile_desc = str(tile_row) + "_" + str(tile_column)
-                tile_orig = membrane_img_orig[(tile_row * watershed_tile_size):((tile_row + 1) * watershed_tile_size), (tile_column * watershed_tile_size):((tile_column + 1) * watershed_tile_size)]
+                tile_orig = membrane_img[(tile_row * watershed_tile_size):((tile_row + 1) * watershed_tile_size), (tile_column * watershed_tile_size):((tile_column + 1) * watershed_tile_size)]
                 #run a basic watershed with segments approximatelly dimensioned by membrane_diameter and high compactness
                 num_markers = (len(tile) / membrane_diameter) * (len(tile[0]) / membrane_diameter)
                 wsLabels = watershed(tile * 255, markers=num_markers, compactness=membrane_compactness)

@@ -2,7 +2,7 @@ import os
 import sys
 import datetime
 import psutil
-import PySimpleGUI as sg
+import FreeSimpleGUI as sg
 import pipex
 
 

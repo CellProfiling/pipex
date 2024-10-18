@@ -9,7 +9,7 @@ Pillow==10.1.0
 protobuf==3.20.3
 geobuf==1.1.1
 psutil==5.9.7
-PySimpleGUI==4.60.5
+FreeSimpleGUI==5.1.1
 qnorm==0.8.1
 scanpy==1.9.6
 scikit-image==0.21.0
