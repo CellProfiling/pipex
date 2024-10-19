@@ -48,7 +48,7 @@ if __name__ =='__main__':
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
         f.close()
-    with open(data_folder + '/log_settings_geojson.txt', 'w+', encoding='utf-8') as f:
+    with open(os.path.join(data_folder, 'log_settings_geojson.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time geojson = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
         f.close()
@@ -56,8 +56,8 @@ if __name__ =='__main__':
     print(">>> Start time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Load segmentation data in numpy array format
-    labels = np.load(data_folder + '/analysis/segmentation_data.npy', allow_pickle=True)
-    df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
+    labels = np.load(os.path.join(data_folder, 'analysis/segmentation_data.npy'), allow_pickle=True)
+    df = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
 
     markers = []
     #Getting the list of marker names
@@ -120,7 +120,7 @@ if __name__ =='__main__':
         GEOdata.append(cell_data)
 
     #dump GEOdata variable to json file
-    with open(data_folder + '/analysis/cell_segmentation_geo.json', 'w') as outfile:
+    with open(os.path.join(data_folder, 'analysis/cell_segmentation_geo.json'), 'w') as outfile:
         geojson.dump(GEOdata, outfile)
 
     print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

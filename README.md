@@ -36,7 +36,7 @@ Why PIPEX
 Requirements
 ------------
 
-- Currently, any linux distribution with python 3. [Note] a docker image is also provided.
+- Any regular linux distribution or windows with a modern python 3 installation. [Note] a docker image is also provided.
 - Enough RAM (and/or SSD hard disk to be used as swap memory in case of linux) to handle the working images' resolution. As a guideline:
   - Up to 6k resolution -> 8GB.
   - Up to 12k resolution -> 16GB. 

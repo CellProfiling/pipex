@@ -100,7 +100,7 @@ if __name__ =='__main__':
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
         f.close()
-    with open(data_folder + '/log_settings_filter.txt', 'w+', encoding='utf-8') as f:
+    with open(os.path.join(data_folder, 'log_settings_filter.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time filter = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
         f.close()
@@ -108,8 +108,8 @@ if __name__ =='__main__':
     print(">>> Start time generate_filtered_masks =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Load segmentation data in numpy array format
-    labels = np.load(data_folder + '/analysis/segmentation_data.npy')
-    df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
+    labels = np.load(os.path.join(data_folder, 'analysis/segmentation_data.npy'))
+    df = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
 
     if (field != "" and values != ""):
         value_array = values.split(",")
@@ -120,16 +120,16 @@ if __name__ =='__main__':
         ix = np.in1d(labels.ravel(), label_list).reshape(labels.shape)
         labels = np.where(ix, labels, 0)
 
-        np.save(data_folder + '/analysis/segmentation_data_filtered.npy', labels)
+        np.save(os.path.join(data_folder, 'analysis/segmentation_data_filtered.npy'), labels)
         print(">>> Filtered segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
         labelsBinary = np.copy(labels)
         labelsBinary[labelsBinary > 0] = 1
-        imsave(data_folder + "/analysis/segmentation_filtered_binary_mask.tif", np.uint16(labelsBinary * 65535))
+        imsave(os.path.join(data_folder, "analysis/segmentation_filtered_binary_mask.tif"), np.uint16(labelsBinary * 65535))
         print(">>> Filtered segmentation result binary image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         del labelsBinary
 
-        imsave(data_folder + "/analysis/segmentation_filtered_mask.tif", np.uint16(labels * 65535))
+        imsave(os.path.join(data_folder, "analysis/segmentation_filtered_mask.tif"), np.uint16(labels * 65535))
         print(">>> Filtered segmentation result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (lmd == "yes"):
@@ -138,7 +138,7 @@ if __name__ =='__main__':
         _3, bottom_right_point = closest_cell(df, df['x'].quantile(.75), df['y'].quantile(.75))
         print(">>> LMD calibration cell/points: cell_id",int(_1),"-",top_left_point,", cell_id",int(_2),"-",top_right_point,", cell_id",int(_3),"-",bottom_right_point,"chosen =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
-        cells = np.load(data_folder + '/analysis/segmentation_data.npy')
+        cells = np.load(os.path.join(data_folder, 'analysis/segmentation_data.npy'))
         ix = np.in1d(cells.ravel(), [_1,_2,_3]).reshape(cells.shape)
         cells = np.where(ix, cells, 0)
         cells[cells > 0] = 1
@@ -153,7 +153,7 @@ if __name__ =='__main__':
         overlay_img = cv2.line(overlay_img, (int(max(0, top_right_point[1] - 10)), int(top_right_point[0])), (int(min(len(cells[0]), top_right_point[1] + 10)), int(top_right_point[0])), (0, 0, 255, 255), 1)
         overlay_img = cv2.line(overlay_img, (int(bottom_right_point[1]), int(max(0, bottom_right_point[0] - 10))), (int(bottom_right_point[1]), int(min(len(cells), bottom_right_point[0] + 10))), (0, 0, 255, 255), 1)
         overlay_img = cv2.line(overlay_img, (int(max(0, bottom_right_point[1] - 10)), int(bottom_right_point[0])), (int(min(len(cells[0]), bottom_right_point[1] + 10)), int(bottom_right_point[0])), (0, 0, 255, 255), 1)
-        cv2.imwrite(data_folder + "/analysis/lmd_calibration_points_overlay.png", overlay_img)
+        cv2.imwrite(os.path.join(data_folder, "analysis/lmd_calibration_points_overlay.png"), overlay_img)
         print(">>> LMD calibration points transparent image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
         calibration_points = np.array([top_left_point, top_right_point, bottom_right_point])
@@ -172,22 +172,22 @@ if __name__ =='__main__':
                 label_group = list(filter(np.unique(labels).__contains__, df_group['cell_id'].tolist()))
                 cell_sets = [{"classes": np.unique(label_group), "well": "A" + str(i)}]
                 shape_collection = sl(labels, cell_sets, calibration_points)
-                shape_collection.plot(fig_size=(10, 10), save_name=data_folder + "/analysis/lmd_shapes_plot_" + str(i) + ".jpg")
+                shape_collection.plot(fig_size=(10, 10), save_name=os.path.join(data_folder, "analysis/lmd_shapes_plot_" + str(i) + ".jpg"))
                 print(">>> LMD shapes plot for group",str(i),"saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 print(">>> LMD shapes statistics for group",str(i)," block start=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 print(shape_collection.stats())
                 print(">>> LMD shapes statistics for group",str(i)," block end=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-                shape_collection.save(data_folder + "/analysis/lmd_shapes_" + str(i) + ".xml")
+                shape_collection.save(os.path.join(data_folder, "analysis/lmd_shapes_" + str(i) + ".xml"))
                 print(">>> LMD XML file for group",str(i)," saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         else:
             cell_sets = [{"classes": np.unique(labels), "well": "1"}]
             shape_collection = sl(labels, cell_sets, calibration_points)
-            shape_collection.plot(fig_size=(10, 10), save_name=data_folder + "/analysis/lmd_shapes_plot.jpg")
+            shape_collection.plot(fig_size=(10, 10), save_name=os.path.join(data_folder, "analysis/lmd_shapes_plot.jpg"))
             print(">>> LMD shapes plot saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             print(">>> LMD shapes statistics block start=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             shape_collection.stats()
             print(">>> LMD shapes statistics block end=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-            shape_collection.save(data_folder + "/analysis/lmd_shapes.xml")
+            shape_collection.save(os.path.join(data_folder, "analysis/lmd_shapes.xml"))
             print(">>> LMD XML file saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
@@ -228,16 +228,16 @@ if __name__ =='__main__':
                 if tile_relabel == "yes":
                     tile = relabel_sequential(tile)[0]
                 tile_desc = str(row) + '_' + str(column)
-                np.save(data_folder + '/analysis/segmentation_data_filtered_tile_' + tile_desc + '.npy', tile)
+                np.save(os.path.join(data_folder, 'analysis/segmentation_data_filtered_tile_' + tile_desc + '.npy'), tile)
                 print(">>> Filtered segmentation tile ",tile_desc," result numpy binary data saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 tileBinary = np.copy(tile)
                 tileBinary[tileBinary > 0] = 1
-                imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_binary_mask.tif", np.uint16(tileBinary * 65535))
+                imsave(os.path.join(data_folder, "analysis/segmentation_filtered_tile_" + tile_desc + "_binary_mask.tif"), np.uint16(tileBinary * 65535))
                 print(">>> Filtered segmentation tile ",tile_desc," result binary image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 del tileBinary
 
-                imsave(data_folder + "/analysis/segmentation_filtered_tile_" + tile_desc + "_mask.tif", np.uint16(tile * 65535))
+                imsave(os.path.join(data_folder, "analysis/segmentation_filtered_tile_" + tile_desc + "_mask.tif"), np.uint16(tile * 65535))
                 print(">>> Filtered segmentation tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 

@@ -43,7 +43,7 @@ max_samples = 200000
 #Function to perform all data filtering, normalization and derived calculations
 def data_calculations():
     #Reading the cell segmentation csv file
-    df_norm = pd.read_csv(data_folder + '/analysis/cell_data.csv')
+    df_norm = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
 
     markers = []
     #Getting the list of marker names
@@ -121,7 +121,7 @@ def data_calculations():
 
         print(">>> Quantile normalization performed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
-    df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_norm.csv', index=False)
+    df_norm.to_csv(os.path.join(data_folder, 'analysis/downstream/cell_data_norm.csv'), index=False)
 
     #We calculate and plot the correlations between all markers
     df_corr = df_norm.copy()
@@ -130,14 +130,14 @@ def data_calculations():
     plt.figure()
     fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
     sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
-    plt.savefig(data_folder + '/analysis/downstream/correlation_heatmap.jpg')
+    plt.savefig(os.path.join(data_folder, 'analysis/downstream/correlation_heatmap.jpg'))
     plt.clf()
     plt.close()
 
     #We calculate and plot the dendogram of the correlations clustermap
     plt.figure()
     sns_clustermap = sns.clustermap(df_corr, figsize=(image_size / 100,image_size / 140))
-    plt.savefig(data_folder + '/analysis/downstream/correlation_dendogram.jpg')
+    plt.savefig(os.path.join(data_folder, 'analysis/downstream/correlation_dendogram.jpg'))
     plt.clf()
     plt.close()
 
@@ -194,11 +194,11 @@ def data_calculations():
     sns_boxplot.set_xticklabels(sns_boxplot.get_xticklabels(), rotation = 45)
     sns_boxplot.set(xlabel=None)
     sns_boxplot.set(ylabel=None)
-    plt.savefig(data_folder + '/analysis/downstream/markers_boxplot.jpg')
+    plt.savefig(os.path.join(data_folder, 'analysis/downstream/markers_boxplot.jpg'))
     plt.clf()
     plt.close()
 
-    df_ext.to_csv(data_folder + '/analysis/downstream/cell_data_markers.csv', index=False)
+    df_ext.to_csv(os.path.join(data_folder, 'analysis/downstream/cell_data_markers.csv'), index=False)
     print(">>> Markers information calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     del df_corr
@@ -259,7 +259,7 @@ def fill_surface_html_template(markers, df_norm):
         z_formatted = z_formatted[:-1] + "],"
     z_formatted = z_formatted[:-1] + "]"
     html_content = html_content.replace("$$$DATA$$$", z_formatted)
-    f = open(data_folder + '/analysis/downstream/markers_surface.html', 'w')
+    f = open(os.path.join(data_folder, 'analysis/downstream/markers_surface.html'), 'w')
     f.write(html_content)
     f.close()
 
@@ -416,7 +416,7 @@ def refine_clustering(adata, cluster_type):
 #    if len(cluster_dif_list_positive) > 0:
 #        clustering_merge_data['dif_median_positive'] = float(statistics.median(cluster_dif_list_positive))
 
-    cell_types = pd.read_csv(data_folder + '/cell_types.csv')
+    cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
     for index, row in cell_types.iterrows():
         for cluster_id in clustering_merge_data['scores']:
             if row['rank_filter'] != "positive_only" or "positive_only" in clustering_merge_data['scores'][cluster_id]['rank_filter']:
@@ -465,7 +465,7 @@ def refine_clustering(adata, cluster_type):
     clustering_merge_data["scores"] = OrderedDict(sorted(clustering_merge_data["scores"].items()))
     clustering_merge_data["cell_types"] = OrderedDict(sorted(clustering_merge_data["cell_types"].items()))
     clustering_merge_data["candidates"] = OrderedDict(sorted(clustering_merge_data["candidates"].items()))
-    with open(data_folder + '/analysis/downstream/cell_types_result_' + cluster_type + '.json', 'w') as outfile:
+    with open(os.path.join(data_folder, 'analysis/downstream/cell_types_result_' + cluster_type + '.json'), 'w') as outfile:
         json.dump(clustering_merge_data, outfile, indent = 4)
 
 
@@ -559,7 +559,7 @@ def clustering(df_norm, markers):
                 plt.xlabel('Values of K')
                 plt.ylabel('Distortion')
                 plt.title('The Elbow Method using Distortion')
-                plt.savefig(data_folder + '/analysis/downstream/elbow_distortion.jpg')
+                plt.savefig(os.path.join(data_folder, 'analysis/downstream/elbow_distortion.jpg'))
                 plt.clf()
                 plt.close()
 
@@ -568,7 +568,7 @@ def clustering(df_norm, markers):
                 plt.xlabel('Values of K')
                 plt.ylabel('Inertia')
                 plt.title('The Elbow Method using Inertia')
-                plt.savefig(data_folder + '/analysis/downstream/elbow_inertia.jpg')
+                plt.savefig(os.path.join(data_folder, 'analysis/downstream/elbow_inertia.jpg'))
                 plt.clf()
                 plt.close()
                 print(">>> Elbow method calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
@@ -593,7 +593,7 @@ def clustering(df_norm, markers):
                 print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (leiden == 'yes' or kmeans == 'yes'):
-        df = pd.read_csv(data_folder + '/analysis/cell_data.csv')
+        df = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
         if (leiden == 'yes'):
             df['leiden'] = df['cell_id'].map(adata.obs.set_index('id')['leiden']).astype(str)
             df['leiden'] = df['leiden'].fillna('')
@@ -618,7 +618,7 @@ def clustering(df_norm, markers):
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
             sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
-            plt.savefig(data_folder + '/analysis/downstream/leiden_clusters_correlation_heatmap.jpg')
+            plt.savefig(os.path.join(data_folder, 'analysis/downstream/leiden_clusters_correlation_heatmap.jpg'))
             plt.clf()
             plt.close()
 
@@ -647,13 +647,13 @@ def clustering(df_norm, markers):
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
             sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
-            plt.savefig(data_folder + '/analysis/downstream/kmeans_clusters_correlation_heatmap.jpg')
+            plt.savefig(os.path.join(data_folder, 'analysis/downstream/kmeans_clusters_correlation_heatmap.jpg'))
             plt.clf()
             plt.close()
 
-        df.to_csv(data_folder + '/analysis/cell_data.csv', index=False)
-        df_norm.to_csv(data_folder + '/analysis/downstream/cell_data_norm.csv', index=False)
-        adata.write(data_folder + '/analysis/downstream/anndata.h5ad')
+        df.to_csv(os.path.join(data_folder, 'analysis/cell_data.csv'), index=False)
+        df_norm.to_csv(os.path.join(data_folder, 'analysis/downstream/cell_data_norm.csv'), index=False)
+        adata.write(os.path.join(data_folder, 'analysis/downstream/anndata.h5ad'))
 
 #Function to handle the command line parameters passed
 def options(argv):
@@ -727,7 +727,7 @@ if __name__ =='__main__':
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
         f.close()
-    with open(data_folder + '/log_settings_analysis.txt', 'w+', encoding='utf-8') as f:
+    with open(os.path.join(data_folder, 'log_settings_analysis.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time analysis = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
         f.close()
@@ -735,12 +735,12 @@ if __name__ =='__main__':
     print(">>> Start time analysis =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     try:
-        os.mkdir(data_folder + '/analysis/downstream')
+        os.mkdir(os.path.join(data_folder, 'analysis/downstream'))
     except OSError as error:
         print('>>> analysis/downstream folder already exists, overwriting results', flush=True)
 
     #Saving general settings for libraries
-    sc.settings.figdir= data_folder + '/analysis/downstream'
+    sc.settings.figdir= os.path.join(data_folder, 'analysis/downstream')
     sc.settings.set_figure_params(format='jpg',figsize=(image_size / 100, image_size / 100))
     plt.rcParams['figure.dpi'] = 200
     sns.set(font_scale=0.6)

@@ -6,7 +6,9 @@ import FreeSimpleGUI as sg
 import pipex
 
 
-data_folder = os.path.abspath(os.environ.get('PIPEX_DATA'))
+data_folder = os.path.join(os.getcwd(), "data")
+if "PIPEX_DATA" in os.environ:
+    data_folder = os.path.abspath(os.environ.get('PIPEX_DATA'))
 
 pidfile_filename = './RUNNING'
 if "PIPEX_WORK" in os.environ:
@@ -119,10 +121,10 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Image size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='1000',s=20,disabled=True, key='-ANALYSIS_SIZE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_9)],
           [sg.Text('  - Analysis markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-ANALYSIS_MARKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_27)],
           [sg.Text('  - Use binarized markers', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_USEBIN-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_40)],
-          [sg.Text('  - Cell size top crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='5',s=20,disabled=True, key='-ANALYSIS_TOPTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_28)],
-          [sg.Text('  - Cell size bottom crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='5',s=20,disabled=True, key='-ANALYSIS_BOTTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_34)],
-          [sg.Text('  - Custom Cell Profiling filtering:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_CUSFIL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_35)],
-          [sg.Text('  - log1p normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_LOGNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_37)],
+          [sg.Text('  - Cell size top crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-ANALYSIS_TOPTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_28)],
+          [sg.Text('  - Cell size bottom crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-ANALYSIS_BOTTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_34)],
+          [sg.Text('  - Custom Cell Profiling filtering:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=False,disabled=True, key='-ANALYSIS_CUSFIL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_35)],
+          [sg.Text('  - log1p normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=False,disabled=True, key='-ANALYSIS_LOGNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_37)],
           [sg.Text('  - Standard normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_STDNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_39)],
           [sg.Text('  - Batch correction by column:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_BATCOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_38)],
           [sg.Text('  - Quantile normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-ANALYSIS_QUANOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_36)],
@@ -165,7 +167,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Compress regions', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_COMPRESS_REGIONS-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_50)],
           [sg.Text('  - Include html', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_HTML-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_51)]]
 
-layout = [[sg.Column(column, scrollable=True,  vertical_scroll_only=True, size=(620,700))],
+layout = [[sg.Column(column, scrollable=True,  vertical_scroll_only=True, size=(800,700))],
           [sg.Text('_'*85)],
           [sg.Button('Run'), sg.Button('Batch mode'), sg.Button('Cancel')]]
 

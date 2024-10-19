@@ -186,7 +186,7 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
                 subtile_data = generate_tile_compensation_data(tile, bins, kernel_size)
                 apply_tile_compensation('', tile, bins, subtile_data, kernel_size, kernel_size / 10)
 
-    imsave(data_folder + "/preprocessed/" + os.path.splitext(file)[0] + "_gradient.jpg", np.uint8(np_img * 255))
+    imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(file)[0] + "_gradient.jpg"), np.uint8(np_img * 255))
 
     print(">>> Applied gradient fix for image",f_name,"=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
 
@@ -253,14 +253,14 @@ def apply_thresholds(f_name, np_img, threshold_min, threshold_max):
     if (threshold_min > 0):
         np_thres = np_img.copy()
         np_thres[np_thres >= threshold_min] = 0
-        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_threshold_bottom.tif", np.uint16(np_thres * 65535))
+        imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_threshold_bottom.tif"), np.uint16(np_thres * 65535))
         del np_thres
         np_img[np_img < threshold_min] = 0
 
     if (threshold_max < 100):
         np_thres = np_img.copy()
         np_thres[np_img <= threshold_max] = 0
-        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_threshold_top.tif", np.uint16(np_thres * 65535))
+        imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_threshold_top.tif"), np.uint16(np_thres * 65535))
         del np_thres
         np_img[np_img > threshold_max] = 0
 
@@ -338,14 +338,14 @@ def preprocess_image(f_name, numpy_img):
             bins = np.append(bins, 1.0)
             spot_threshold = bins[bin_max]
             np_img = np.reshape(np.array([x if x <= spot_threshold else spot_threshold + math.pow((x - spot_threshold) * 100, 0.6) / 100 for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_flattened.jpg", np.uint8(np_img * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_flattened.jpg"), np.uint8(np_img * 255))
 
         if final_bright_levels == 0:
             c_otsu = threshold_multiotsu(np_img, 3)
             bins = np.insert(c_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_3.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_3.tif"), np.uint8(regions * 255))
 
             c_otsu = threshold_multiotsu(np_img, 4)
             temp_otsu = c_otsu.copy()
@@ -353,21 +353,21 @@ def preprocess_image(f_name, numpy_img):
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_1-2.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_1-2.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [1])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_1-3.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_1-3.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [0])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_2-3.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_4_2-3.tif"), np.uint8(regions * 255))
 
             c_otsu = threshold_multiotsu(np_img, 5)
             temp_otsu = c_otsu.copy()
@@ -375,42 +375,42 @@ def preprocess_image(f_name, numpy_img):
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-2.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-2.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [1,3])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-3.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-3.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [1,2])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-4.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_1-4.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [0,3])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_2-3.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_2-3.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [0,2])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_2-4.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_2-4.tif"), np.uint8(regions * 255))
 
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [0,1])
             bins = np.insert(temp_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=bins)
             regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-            imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_3-4.tif", np.uint8(regions * 255))
+            imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu_5_3-4.tif"), np.uint8(regions * 255))
 
             final_bright_levels = 3
 
@@ -419,7 +419,7 @@ def preprocess_image(f_name, numpy_img):
         bins = np.append(bins, 1.0)
         regions = np.digitize(np_img, bins=bins)
         regions = np.reshape(np.array([bins[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
-        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + "_otsu.tif", np.uint8(regions * 255))
+        imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + "_otsu.tif"), np.uint8(regions * 255))
 
         if (light_gradient > 1):
             gradient_data = generate_tile_gradient_data(np_img, bins, tile_size)
@@ -434,11 +434,11 @@ def preprocess_image(f_name, numpy_img):
         print("exposure")
         np_img = np.reshape(np.array([(x * exposure) for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
         np_img = np.clip(np_img, 0.0, 1.0)
-    imsave(data_folder + "/preprocessed/" + f_name, np.uint16(np_img * 65535))
+    imsave(os.path.join(data_folder, "preprocessed/" + f_name), np.uint16(np_img * 65535))
     print(">>> Preprocessed result image",f_name,"saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if (heat_map == 'yes'):
-        imsave(data_folder + "/preprocessed/" + os.path.splitext(f_name)[0] + '_heatmap.jpg', cv2.applyColorMap(np.uint8(np.reshape(np.array([1 - x for x in np.ravel(np_img)]), (len(np_img), len(np_img[0]))) * 255), cv2.COLORMAP_PARULA))
+        imsave(os.path.join(data_folder, "preprocessed/" + os.path.splitext(f_name)[0] + '_heatmap.jpg'), cv2.applyColorMap(np.uint8(np.reshape(np.array([1 - x for x in np.ravel(np_img)]), (len(np_img), len(np_img[0]))) * 255), cv2.COLORMAP_PARULA))
         print(">>> Preprocessed heatmap for image ",f_name,"saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
 
@@ -451,7 +451,7 @@ if __name__ =='__main__':
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
         f.close()
-    with open(data_folder + '/log_settings_preprocessing.txt', 'w+', encoding='utf-8') as f:
+    with open(os.path.join(data_folder, 'log_settings_preprocessing.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time preprocessing = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
         f.close()
@@ -459,14 +459,14 @@ if __name__ =='__main__':
     print(">>> Start time preprocessing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     try:
-        os.mkdir(data_folder + '/preprocessed')
+        os.mkdir(os.path.join(data_folder, 'preprocessed'))
     except OSError as error:
         print('>>> preprocessed folder already exists, overwriting results', flush=True)
 
     tile_data = {}
     gradient_data = []
     for file in sorted(os.listdir(data_folder)):
-        file_path = data_folder + '/' + file
+        file_path = os.path.join(data_folder, file)
         if fnmatch.fnmatch(file, '*Empty.*') or fnmatch.fnmatch(file, '*Blank.*') or os.path.isdir(file_path):
             continue
 
