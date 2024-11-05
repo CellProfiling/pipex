@@ -6,7 +6,6 @@ import datetime
 import sys
 from skimage.measure import approximate_polygon
 import numpy as np
-import struct
 
 data_folder = os.environ.get('PIPEX_DATA')
 include_marker_images = "no"
@@ -21,7 +20,7 @@ def exporting_tissuumaps ():
         print(">>> Impossible to display geojson without a background image", flush=True)
         include_geojson = "no"
     if include_geojson == "yes":
-        if not os.path.exists(os.path.join(data_folder, 'analysis/cell_segmentation_geo.json')):
+        if not os.path.exists(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.json')):
             print(">>> Impossible to display geojson without a cell segmentation file", flush=True)
             include_geojson = "no"
     
@@ -41,7 +40,7 @@ def exporting_tissuumaps ():
         if compress_geojson == "yes":
             import geobuf
             # load os.path.join(data_folder, 'analysis/cell_segmentation_geo.json') as json
-            with open(os.path.join(data_folder, 'analysis/cell_segmentation_geo.json'), 'r') as f:
+            with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.json'), 'r') as f:
                 geojson_data = json.load(f)
                 # Remove measurements from geojson_data[i].properties.measurements
                 for f in geojson_data:
@@ -67,7 +66,7 @@ def exporting_tissuumaps ():
                 pbf = data.SerializeToString()
 
                 cell_segmentation_path = "../cell_segmentation_geo.pbf"
-                with open(os.path.join(data_folder, 'analysis/cell_segmentation_geo.pbf'), 'wb') as f:
+                with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.pbf'), 'wb') as f:
                     f.write(pbf)
         else:
             cell_segmentation_path = "../cell_segmentation_geo.json"
@@ -129,21 +128,21 @@ def exporting_tissuumaps ():
             }
         ],
     })
-    adata.write_h5ad(os.path.join(data_folder, 'analysis/downstream/anndata_TissUUmaps.h5ad'))
+    adata.write_h5ad(os.path.join(data_folder, 'analysis', 'downstream', 'anndata_TissUUmaps.h5ad'))
 
     if include_html == "yes":
         import tissuumaps
 
-        state = tissuumaps.read_h5ad.h5ad_to_tmap("", os.path.join(data_folder, 'analysis/downstream/anndata_TissUUmaps.h5ad'))
+        state = tissuumaps.read_h5ad.h5ad_to_tmap("", os.path.join(data_folder, 'analysis', 'downstream', 'anndata_TissUUmaps.h5ad'))
         tissuumaps.views.exportToStatic(
             json.dumps(state), 
-            os.path.join(data_folder, 'analysis/downstream/TissUUmaps_webexport/'),
-            os.path.join(data_folder, 'analysis/downstream')
+            os.path.join(data_folder, 'analysis', 'downstream', 'TissUUmaps_webexport'),
+            os.path.join(data_folder, 'analysis', 'downstream')
         )
         from urllib.request import urlretrieve
         for plugin in ["Feature_Space","InteractionQC","Spot_Inspector"]:
             url = f"https://tissuumaps.github.io/TissUUmaps/plugins/latest/{plugin}.js"
-            filename = os.path.join(data_folder, 'analysis/downstream/TissUUmaps_webexport/plugins/', f"{plugin}.js")
+            filename = os.path.join(data_folder, 'analysis', 'downstream', 'TissUUmaps_webexport', 'plugins', f"{plugin}.js")
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             urlretrieve(url, filename)
 

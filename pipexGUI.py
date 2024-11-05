@@ -31,7 +31,7 @@ tooltip_3 = '<number of pixels, can be 0>: \nexample -> 20'
 tooltip_4 = '<optional, name before . in image file>: \nexample, from image filename "reg001_cyc008_ch003_CDH1.tif" -> CDH1'
 tooltip_5 = '<optional, number of pixels>: \nexample -> 25'
 tooltip_6 = '<optional, "squareness" of the membrane, gradation between 0.001 and 0.999>: \nexample -> 0.9'
-tooltip_7 = '<yes or no to enhance poor images>: \nexample -> yes'
+tooltip_7 = '<optional, name of the cluster column to use to perform the neigborhood analysis upon>: \nexample -> kmeans'
 tooltip_8 = '<list of markers names before . in image files>: \nexample -> DAPI1,CDH1,AMY2A,SST,GORASP2'
 tooltip_9 = '<optional, one-side approximate resolution>: \nexample -> 1000'
 tooltip_10 = '<optional, name of the column to add as cluster id information from cell_data.csv>: \nexample -> kmeans'
@@ -46,9 +46,8 @@ tooltip_18 = '<intensities above this percentage will be deleted>: \nexample -> 
 tooltip_19 = '<percentage of the image base intensity to apply>: \nexample -> 150'
 tooltip_20 = '<number of pixels of a tile>: \nexample -> 1844'
 tooltip_21 = '<number of pixels to use as smooth region for the tile cut>: \nexample -> 20'
-tooltip_22 = '<yes or no to generate heat maps per image>: \nexample -> yes'
 tooltip_23 = '<optional, "strictness" of stardist detections, gradation between 0.001 and 0.999>: \nexample -> 0.5'
-tooltip_24 = '<number, main levels of intensity in the image [normally 3-5] and their 2 selected focus>: \nexample -> 4:1:3'
+tooltip_24 = '<otsu classes, i.e 3 OR otsu classes and specific bin filtering, i.e 5:1:2>: \nexample -> 4:1:3'
 tooltip_25 = '<number, factor of complexity of light issues [1 to 4 should be enough]>: \nexample -> 3'
 tooltip_26 = '<yes or no to reduce artifacts or foldings to a main intensity level>: \nexample -> yes'
 tooltip_27 = '<optional, list of present specific markers to analyze>: \nexample -> AMY2A,SST,GORASP2'
@@ -59,12 +58,12 @@ tooltip_31 = '<yes or no to show elbow analysis for kmeans>: \nexample -> yes'
 tooltip_32 = '<force k number of cluster in kmeans>: \nexample -> 10'
 tooltip_33 = '<yes or no to keep segmented membranes without nuclei as cells>: \nexample -> no'
 tooltip_34 = '<percentage of smallest cells to remove>: \nexample -> 5'
-tooltip_35 = '<optional, yes or no to apply custom Cell Profiling lab\'s biomarkers filtering>: \nexample -> yes'
+tooltip_35 = '<optional, full | nuc | mem value to indicate the type of the custom segmentation attached>: \nexample -> full'
 tooltip_36 = '<optional, yes or no to apply log1p normalization to the markers>: \nexample -> yes'
 tooltip_37 = '<optional, yes or no to apply quantile normalization to the markers>: \nexample -> yes'
 tooltip_38 = '<optional, name of the column in cell_data.csv to perform batch correction by>: \nexample -> batch_id'
 tooltip_39 = '<optional, yes or no to apply 0 to 1 re-scale normalization>: \nexample -> yes'
-tooltip_40 = '<optional, yes or no to use binarized columns for clustering>: \nexample -> no'
+tooltip_40 = '<optional, suffix for the markers to use as input columns for the analysis>: \nexample -> _local_90'
 tooltip_41 = '<optional, list of present specific markers to inlcude>: \nexample -> AMY2A,SST,GORASP2'
 tooltip_42 = '<optional, name of the column to add as cluster color information from cell_data.csv>: \nexample -> kmeans_color'
 tooltip_43 = '<optional, "strictness" of stardist detections proximity, gradation between 0.001 and 0.999>: \nexample -> 0.5'
@@ -80,6 +79,7 @@ tooltip_52 = '<optional, dilation of shapes in pixels>: \nexample -> 0'
 tooltip_53 = '<optional, number of datapoints used for smoothing the shapes>: \nexample -> 15'
 tooltip_54 = '<optional, "none"/"hilbert"/"greedy" optimization of cutting path between shapes> : example -> none'
 tooltip_55 = '<optional, nearest neighbour heuristic distance for merging shapes>: \nexample -> 300'
+tooltip_56 = '<optional, list of present specific markers to preprocess>: \nexample -> DAPI,CTNNB1,AMY2A,SST'
 
 
 
@@ -89,16 +89,16 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('Choose the sequence of commands you want PIPEX to perform:', font='any 12')],
           [sg.Text('_'*85)],
           [sg.Checkbox('Preprocessing', font='any 12 bold', key='-PREPROCESS-', enable_events=True)],
+          [sg.Text('  - Preprocessing markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-PREPROCESS_MARKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_56)],
           [sg.Text('  - Min. threshold:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20, disabled=True, key='-PREPROCESS_THRMIN-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_17)],
           [sg.Text('  - Max. threshold:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='100',s=20, disabled=True, key='-PREPROCESS_THRMAX-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_18)],
+          [sg.Text('  - Otsu threshold levels:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-PREPROCESS_TILOTS-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_24)],
+          [sg.Text('  - Flatten spots', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILFLA-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_26)],
           [sg.Text('  - Balance tiles', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILFIX-', disabled=True, enable_events=True)],
           [sg.Text('  - Tile size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='1844',s=20,disabled=True, key='-PREPROCESS_TILSIZ-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_20)],
-          [sg.Text('  - Bright levels:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='3',s=20,disabled=True, key='-PREPROCESS_TILOTS-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_24)],
-          [sg.Text('  - Flatten spots', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_TILFLA-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_26)],
           [sg.Text('  - Light gradient:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='3',s=20,disabled=True, key='-PREPROCESS_TILKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_25)],
           [sg.Text('  - Stitch size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='40',s=20,disabled=True, key='-PREPROCESS_TILSTI-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_21)],
           [sg.Text('  - Exposure:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='100',s=20, disabled=True, key='-PREPROCESS_EXPOSU-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_19)],
-          [sg.Text('  - Generate heat maps', pad=((20,0), (0,0))), sg.Checkbox('',key='-PREPROCESS_HEAMAP-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_22)],
           [sg.Text('_'*85)],
           [sg.Checkbox('Cell segmentation', font='any 12 bold', key='-SEGMENTATION-', enable_events=True)],
           [sg.Text('  - NUCLEI marker:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='DAPI1',s=20,disabled=True, key='-SEGMENTATION_NUCMARK-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_1)],
@@ -112,18 +112,17 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - MEMBRANE diameter:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='25',s=20,disabled=True, key='-SEGMENTATION_MEMDIAM-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_5)],
           [sg.Text('  - MEMBRANE compactness:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0.9',s=20,disabled=True, key='-SEGMENTATION_MEMCOMP-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_6)],
           [sg.Text('  - Keep membrane without nuclei:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-SEGMENTATION_MEMKEEP-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_33)],
-          [sg.Text('  - Adjust images:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-SEGMENTATION_ADJUST-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_7)],
-          [sg.Text('  - Custom segmentation:', s=35, pad=((20,0), (0,0))), sg.In(default_text="", size=(30,1), key='-SEGMENTATION_CUSSEG-'), sg.FileBrowse(initial_folder=data_folder), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_46)],
+          [sg.Text('  - Custom segmentation:', s=35, pad=((20,0), (0,0))), sg.In(default_text="", size=(30,1),disabled=True, key='-SEGMENTATION_CUSSEG-'), sg.FileBrowse(initial_folder=data_folder), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_46)],
+          [sg.Text('  - Custom segmentation type:', s=35, pad=((20,0), (0,0))), sg.Combo(['full', 'nuc', 'mem'], default_value='full', key='-SEGMENTATION_CUSSTY-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_35)],
           [sg.Text('  - Measure markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='GORASP2,AMY2A',s=40,disabled=True, key='-SEGMENTATION_MEASURE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_8)],
           [sg.Text('_'*85)],
           [sg.Checkbox('Downstream analysis', font='any 12 bold', key='-ANALYSIS-', enable_events=True)],
           [sg.Text(' NOTE: requires previous \'Segmentation\' results')],
-          [sg.Text('  - Image size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='1000',s=20,disabled=True, key='-ANALYSIS_SIZE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_9)],
           [sg.Text('  - Analysis markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-ANALYSIS_MARKER-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_27)],
-          [sg.Text('  - Use binarized markers', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_USEBIN-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_40)],
+          [sg.Text('  - Image size:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='1000',s=20,disabled=True, key='-ANALYSIS_SIZE-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_9)],
+          [sg.Text('  - Use binarized suffix:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_USEBIN-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_40)],
           [sg.Text('  - Cell size top crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-ANALYSIS_TOPTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_28)],
           [sg.Text('  - Cell size bottom crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-ANALYSIS_BOTTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_34)],
-          [sg.Text('  - Custom Cell Profiling filtering:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=False,disabled=True, key='-ANALYSIS_CUSFIL-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_35)],
           [sg.Text('  - log1p normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=False,disabled=True, key='-ANALYSIS_LOGNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_37)],
           [sg.Text('  - Standard normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_STDNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_39)],
           [sg.Text('  - Batch correction by column:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_BATCOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_38)],
@@ -133,6 +132,7 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - K clusters:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='10',s=20,disabled=True, key='-ANALYSIS_KCLUST-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_32)],
           [sg.Text('  - Calculate elbow method', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_ELBOW-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_31)],
           [sg.Text('  - Refine clusters', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_REFINE-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_47)],
+          [sg.Text('  - Neighborhood analysis over column:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_NEICLU-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_7)],
           [sg.Text('_'*85)],
           [sg.Checkbox('QuPath GeoJSON', font='any 12 bold', key='-QUPATH-', enable_events=True)],
           [sg.Text(' NOTE: requires previous \'Segmentation\' results', pad=((20,0), (0,0)))],
@@ -187,26 +187,22 @@ while True:
     if event == 'Run':
         break
     if event == '-PREPROCESS-':
+        window['-PREPROCESS_MARKER-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_THRMIN-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_THRMAX-'].update(disabled=(not values['-PREPROCESS-']))
+        window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS-']))
+        window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_EXPOSU-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILFIX-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILSIZ-'].update(disabled=(not values['-PREPROCESS-']))
-        window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS-']))
-        window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILKER-'].update(disabled=(not values['-PREPROCESS-']))
         window['-PREPROCESS_TILSTI-'].update(disabled=(not values['-PREPROCESS-']))
-        window['-PREPROCESS_HEAMAP-'].update(disabled=(not values['-PREPROCESS-']))
         if (values['-PREPROCESS-']):
             window['-PREPROCESS_TILSIZ-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
-            window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
-            window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
             window['-PREPROCESS_TILKER-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
             window['-PREPROCESS_TILSTI-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
     if event == '-PREPROCESS_TILFIX-':
         window['-PREPROCESS_TILSIZ-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
-        window['-PREPROCESS_TILOTS-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
-        window['-PREPROCESS_TILFLA-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
         window['-PREPROCESS_TILKER-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
         window['-PREPROCESS_TILSTI-'].update(disabled=(not values['-PREPROCESS_TILFIX-']))
     if event == '-SEGMENTATION-':
@@ -221,8 +217,8 @@ while True:
         window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMCOMP-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMKEEP-'].update(disabled=(not values['-SEGMENTATION-']))
-        window['-SEGMENTATION_ADJUST-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_CUSSEG-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_CUSSTY-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEASURE-'].update(disabled=(not values['-SEGMENTATION-']))
         if (values['-SEGMENTATION-']):
             window['-SEGMENTATION_MEMMARK-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
@@ -240,7 +236,6 @@ while True:
         window['-ANALYSIS_USEBIN-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_TOPTHR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_BOTTHR-'].update(disabled=(not values['-ANALYSIS-']))
-        window['-ANALYSIS_CUSFIL-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_LOGNOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_STDNOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_QUANOR-'].update(disabled=(not values['-ANALYSIS-']))
@@ -250,6 +245,7 @@ while True:
         window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_REFINE-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_NEICLU-'].update(disabled=(not values['-ANALYSIS-']))
         if (values['-ANALYSIS-']):
             window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
             window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
@@ -323,7 +319,7 @@ batch_filename = './pipex_batch_list.txt'
 batch_data = values['-DATA_FOLDER-']
 custom_segmentation_file = values['-SEGMENTATION_CUSSEG-']
 if "PIPEX_WORK" in os.environ:
-    batch_filename = os.environ['PIPEX_WORK'] + '/pipex_batch_list.txt'
+    batch_filename = os.path.join(os.environ['PIPEX_WORK'], 'pipex_batch_list.txt')
     batch_data = batch_data.replace(os.environ['PIPEX_WORK'], './work')
     custom_segmentation_file = custom_segmentation_file.replace(os.environ['PIPEX_WORK'], './work')
 
@@ -333,16 +329,18 @@ if values['-PREPROCESS-']:
         'preprocessing.py -data=' + batch_data +
         ' -threshold_min=' + values['-PREPROCESS_THRMIN-'] +
         ' -threshold_max=' + values['-PREPROCESS_THRMAX-'] +
-        ' -exposure=' + values['-PREPROCESS_EXPOSU-'] +
-        ' -heat_map=' + ('yes' if values['-PREPROCESS_HEAMAP-'] else 'no'))
+        ' -otsu_threshold_levels=' + values['-PREPROCESS_TILOTS-'] +
+        ' -flatten_spots=' + ('yes' if values['-PREPROCESS_TILFLA-'] else 'no') +
+        ' -exposure=' + values['-PREPROCESS_EXPOSU-'])
     if (values['-PREPROCESS_TILFIX-']):
         batch_list = (batch_list +
             ' -tile_size=' + values['-PREPROCESS_TILSIZ-'] +
-            ' -bright_levels=' + values['-PREPROCESS_TILOTS-'] +
-            ' -flatten_spots=' + ('yes' if values['-PREPROCESS_TILFLA-'] else 'no') +
             ' -light_gradient=' + values['-PREPROCESS_TILKER-'] +
             ' -balance_tiles=yes' +
             ' -stitch_size=' + values['-PREPROCESS_TILSTI-'])
+    if (values['-PREPROCESS_MARKER-'] != ''):
+        batch_list = (batch_list +
+            ' -preprocess_markers="' + values['-PREPROCESS_MARKER-']) + '"'
 
 if values['-SEGMENTATION-']:
     batch_list = (batch_list + '\n' +
@@ -352,8 +350,7 @@ if values['-SEGMENTATION-']:
         ' -nuclei_expansion=' + values['-SEGMENTATION_NUCEXPA-'] +
         ' -nuclei_definition=' + values['-SEGMENTATION_NUCDEFI-'] +
         ' -nuclei_closeness=' + values['-SEGMENTATION_NUCCLOS-'] +
-        ' -nuclei_area_limit=' + values['-SEGMENTATION_NUCARLI-'] +
-        ' -adjust_images=' + ('yes' if values['-SEGMENTATION_ADJUST-'] else 'no'))
+        ' -nuclei_area_limit=' + values['-SEGMENTATION_NUCARLI-'])
     if (values['-SEGMENTATION_MEMUSE-']):
         batch_list = (batch_list +
             ' -membrane_marker=' + values['-SEGMENTATION_MEMMARK-'] +
@@ -362,10 +359,11 @@ if values['-SEGMENTATION-']:
             ' -membrane_keep=' + ('yes' if values['-SEGMENTATION_MEMKEEP-'] else 'no'))
     if (values['-SEGMENTATION_CUSSEG-'] != ''):
         batch_list = (batch_list +
-            ' -custom_segmentation=' + custom_segmentation_file)
+            ' -custom_segmentation=' + custom_segmentation_file +
+            ' -custom_segmentation_type=' + values['-SEGMENTATION_CUSSTY-'])
     if (values['-SEGMENTATION_MEASURE-'] != ''):
         batch_list = (batch_list +
-            ' -measure_markers=' + values['-SEGMENTATION_MEASURE-'])
+            ' -measure_markers="' + values['-SEGMENTATION_MEASURE-']) + '"'
 
 if values['-ANALYSIS-']:
     batch_list = (batch_list + '\n' +
@@ -373,12 +371,13 @@ if values['-ANALYSIS-']:
         ' -image_size=' + values['-ANALYSIS_SIZE-'] +
         ' -cellsize_max=' + values['-ANALYSIS_TOPTHR-'] +
         ' -cellsize_min=' + values['-ANALYSIS_BOTTHR-'] +
-        ' -custom_filter=' + ('yes' if values['-ANALYSIS_CUSFIL-'] else 'no') +
         ' -log_norm=' + ('yes' if values['-ANALYSIS_LOGNOR-'] else 'no') +
         ' -std_norm=' + ('yes' if values['-ANALYSIS_STDNOR-'] else 'no') +
         ' -quantile_norm=' + ('yes' if values['-ANALYSIS_QUANOR-'] else 'no') +
-        ' -batch_corr=' + values['-ANALYSIS_BATCOR-'] +
-        ' -use_bin=' + ('yes' if values['-ANALYSIS_USEBIN-'] else 'no'))
+        ' -batch_corr=' + values['-ANALYSIS_BATCOR-'])
+    if (values['-ANALYSIS_USEBIN-'] != ''):
+        batch_list = (batch_list +
+            ' -use_bin=' + values['-ANALYSIS_USEBIN-'])
     if (values['-ANALYSIS_LEIDEN-']):
         batch_list = (batch_list +
             ' -leiden=' + ('yes' if values['-ANALYSIS_LEIDEN-'] else 'no'))
@@ -390,16 +389,19 @@ if values['-ANALYSIS-']:
     if (values['-ANALYSIS_REFINE-']):
         batch_list = (batch_list +
             ' -refine_clusters=' + ('yes' if values['-ANALYSIS_REFINE-'] else 'no'))
+    if (values['-ANALYSIS_NEICLU-'] != ''):
+        batch_list = (batch_list +
+            ' -neigh_cluster_id=' + values['-ANALYSIS_NEICLU-'])
     if (values['-ANALYSIS_MARKER-'] != ''):
         batch_list = (batch_list +
-            ' -analysis_markers=' + values['-ANALYSIS_MARKER-'])
+            ' -analysis_markers="' + values['-ANALYSIS_MARKER-']) + '"'
 
 if values['-QUPATH-']:
     batch_list = (batch_list + '\n' +
         'generate_geojson.py -data=' + batch_data)
     if (values['-QUPATH_MARKER-'] != ''):
         batch_list = (batch_list +
-                      ' -included_markers=' + values['-QUPATH_MARKER-'])
+                      ' -included_markers="' + values['-QUPATH_MARKER-']) + '"'
     if (values['-QUPATH_CLUID-'] != ''):
         batch_list = (batch_list +
                       ' -cluster_id=' + values['-QUPATH_CLUID-'])
@@ -432,7 +434,7 @@ if values['-FILTERED-']:
 if values['-TISSUUMAPS-']:
     batch_list = (batch_list + '\n' +
         'generate_tissuumaps.py -data=' + batch_data +
-        ' -include_marker_images=' + values['-TISSUUMAPS_MARKER-'] +
+        ' -include_marker_images="' + values['-TISSUUMAPS_MARKER-'] + '"' +
         ' -include_geojson=' + ('yes' if values['-TISSUUMAPS_REGION-'] else 'no') +
         ' -compress_geojson=' + ('yes' if values['-TISSUUMAPS_COMPRESS_REGIONS-'] else 'no') +
         ' -include_html=' + ('yes' if values['-TISSUUMAPS_HTML-'] else 'no'))

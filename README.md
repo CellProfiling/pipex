@@ -52,6 +52,8 @@ Installation
   - Example: `cd /home/lab/sandbox`
 - Create a virtual environment:
   - Example: `python3 -m venv pipex`
+- Download PIPEX code from github:
+![Download code](./doc/code.jpg "Download code")
 - Unzip the contents of the `pipex.zip` inside your virtual environment directory
   - Following the example above, you should end having a bunch of files (`pipex.py`, `pipex_process.py`, etc...) in the folder `/home/lab/sandbox/pipex`
 - Navigate to your virtual environment directory and run it:
@@ -111,7 +113,6 @@ There are currently available the following commands:
   - `-membrane_diameter=<optional, number of pixels>` : example -> -membrane_diameter=25. **OBS**: required if membrane marker is used, this is an approximate guideline, the custom watershed segmentation is smart enough to adapt.
   - `-membrane_compactness=<optional, "squareness" of the membrane, gradation between 0.001 and 0.999>` : example -> -membrane_compactness=0.5. **OBS**: required if membrane marker is used, this instructs the watershed algorithm to try to keep a more or less (bigger value is more) square-type segmentation.
   - `-membrane_keep=<yes or no to keep segmented membranes without nuclei>` : example -> -membrane_keep=no. **OBS**: this will keep detected membrane segmentations without an underlying nuclei; useful for nuclei shapes not properly segmented by Stardist
-  - `-adjust_images=<yes or no to enhance poor images>` : example -> -adjust_images=yes. **OBS**: this preprocess nuclei (and membrane if selected) images with poor contrast and/or intensity levels. Does not modify the original images and you can see the altered ones in the `quality\_control` sub-folder
   - `-custom_segmentation=<optional, file path to a pre-made custom segmentation>` : example -> -custom_segmentation=/data/custom_seg.npy. **OBS**: accepts segmentations in numpy array or image mask file formats. This ignores all the previous segmentation parameters, using this custom segmentation for measuring the markers. Understand that many generated output files will not exists
   - `-measure_markers=<list of markers names before . in image files>` : example -> measure_markers=DAPI,CDH1,AMY2A,SST,GORASP2.
 
@@ -125,14 +126,14 @@ There are currently available the following commands:
   - `-log_norm=<optional, yes or no to apply log n + 1 normalization>` : example -> -log_norm=yes. **OBS**: this will apply a log1p normalization to the markers intensities
   - `-std_norm=<optional, yes or no to apply 0 to 1 re-scale normalization>` : example -> -std_norm=yes. **OBS**: this will apply a standard normalization to the markers intensities
   - `-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by>` : example -> -batch_corr=batch_id. **OBS**: this is the name of the column in the cell_data.csv that differentiates each experiment batch, so they can be separated to perform ComBat batch correction.
-  - `-use_bin=<optional, yes or no to use binarized columns for clustering>` : example -> -use_bin=yes. **OBS**: this will use the associated binarized columns for each stated marker ([name of the marker] + '_bin_thres') to calculate the selected clustering methods.
+  - `-use_bin=<optional, suffix for the markers to use as input columns for the analysis>` : example -> -use_bin=_local_90. **OBS**: this will use the associated binarized columns for each stated marker ([name of the marker] + use_bin) to calculate the selected clustering methods.
   - `-quantile_norm=<optional, yes or no to apply quantile normalization>` : example -> -quantile_norm=yes. **OBS**: this will apply an additional quantile normalization to the markers intensities
   - `-leiden=<optional, yes or no to perform leiden clustering>` : example -> -leiden=yes. **OBS**: this will perform a leiden clustering and all its associated data and plots
   - `-kmeans=<optional, yes or no to perform kmeans clustering>` : example -> -kmeans=yes. **OBS**: this will perform a kmeans clustering and all its associated data and plots.
   - `-elbow=<optional, yes or no to show elbow analysis for kmeans>` : example -> -elbow=yes. **OBS**: if kmeans is activated, this will perform a series of 20 kmeans clustering to display the resulting distortion and inertia plots.
   - `-k_clusters=<optional, force k number of cluster in kmeans>` : example -> -k_clusters=10. **OBS**: if kmeans is activated, this will use the specified number of k clusters. The default is 10.
   - `-refine_clusters=<optional, yes or no to refine cluster results>` : example -> -refine_clusters=yes. **OBS**: this will perform a cluster refinement over leiden and/or kmeans unsupervised results based on the rules described in [cell_types.csv] 
-  - `-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on>` : example -> -neigh_cluster_id=kmeans_ref. **OBS**: this will perform a neighborhood analysis based on the specified calculated cluster column
+  - `-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on>` : example -> -neigh_cluster_id=kmeans. **OBS**: this will perform a neighborhood analysis based on the specified calculated cluster column
 
 - `generate_geojson.py` : generates a GEOjson file to be imported in QuPath. MUST be run AFTER a segmentation and optionally after an analysis (if you want the default clustering). Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
@@ -194,7 +195,7 @@ There are currently available the following commands:
 
 Once you have written in `pipex_batch_list.txt` the commands to be sequentially executed by PIPEX you just need to run the following command from the command line (**OBS**: you have to run this command from PIPEX's installation folder!):
 
-`python3 pipex.py`
+`python pipex.py`
 
 This will generate the following sub-folders and items inside the data folder:
 
@@ -202,14 +203,16 @@ This will generate the following sub-folders and items inside the data folder:
   - `segmentation_data.npy` file: the labelled cell regions in numpy array format (for further computing analysis)
   - `segmentation_data_filtered.npy` file: the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step)
   - `segmentation_data_filtered_tile_X_X.npy` file: each tile of the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step with tiling)
+  - `segmentation_mask.tif` file: the cell segmentation labelled mask in TIFF format.
   - `segmentation_binary_mask.tif` file: the cell segmentation binary mask in TIFF format.
   - `segmentation_mask_filtered.tif` file: the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks)
   - `segmentation_mask_filtered_tile_X_X.tif` file: each tile of the filtered cell segmentation mask in TIFF format (if you have executed the generate_filtered_masks step with tiling)
-  - `segmentation_mask_show.jpg` file: the cell segmentation mask over the first image (usually DAPI) in JPG format.
+  - `segmentation_mask_show.jpg` file: the cell segmentation mask over the nuclei image in JPG format.
   - `cell_data.csv` file: the Flow Cytometry Standard file (as CSV) with cell segmentation metadata and all markers intensities calculated (and clustering if analysis command has been performed).
   - `cell_segmentation_geo.json` file: the GEOjson file that can be imported in QuPath as cell segmentation (and clustering if analysis command has been performed). **OBS** this file will only be present if you have run the generate_geojson command)
+  - `cell_segmentation_geo.pbf` file: the previous GEOjson file compressed, for easy integration with TissUUmaps and portability. **OBS** this file will only be present if you have run the generate_geojson command)
 - `analysis/downstream` folder: it contains the following items:
-  - Several image files: the filename shows the data represented in them. **OBS** this files will only be present if you have run the analysis command)
+  - Several image/plots files: the filename shows the data represented in them. **OBS** this files will only be present if you have run the analysis command)
   - `cell_data_norm.csv`: filtered and normalized version of `cell_data.csv` general file. **OBS** this file will only be present if you have run the analysis command)
   - `cell_data_markers.csv`: aggregated data for each of the analyzed markers. **OBS** this file will only be present if you have run the analysis command)
   - `anndata.h5ad`: AnnData object containing the analysis output. **OBS** this file will only be present if you have run the analysis command)
@@ -322,9 +325,9 @@ The result is a more realistic cell segmentation than the Stardist + expansion m
 
 This is the industry's nowadays most common approach. You can find different types of expansions over basic Stardist in many third-party products:
 
-*Stardist expanded in QuPath*: note how QuPath's expansion overlaps, which will cause a double reading of the markers in the affected cells
+*Stardist expanded in QuPath 0.3*: note how QuPath's expansion overlaps, which will cause a double reading of the markers in the affected cells
 
-![Stardist expanded in QuPath](./doc/doc9.jpg "Stardist expanded in QuPath")
+![Stardist expanded in QuPath](./doc/doc9.jpg "Stardist expanded in QuPath 0.3")
 <div style="page-break-after: always;"></div>
 
 *Stardist expanded in Halo AI*: note how Halo AI's expansion overlaps (having the same problem as QuPath) and, even worse, fusions different cell nucleis.

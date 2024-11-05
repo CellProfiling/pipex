@@ -84,7 +84,7 @@ def batch_processor():
                 arg_end_index = curr_command.index(end_char, arg_start_index + 1)
                 curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
                 if os.path.exists(log_filename):
-                    shutil.copyfile(log_filename, curr_data_folder + '/' + os.path.basename(log_filename))
+                    shutil.copyfile(log_filename, os.path.join(curr_data_folder, os.path.basename(log_filename)))
  
     batch_file.close()
 

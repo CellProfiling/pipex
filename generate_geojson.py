@@ -5,7 +5,6 @@ import datetime
 import pandas as pd
 import numpy as np
 import diplib as dip
-import skimage as sk
 import geojson
 
 
@@ -17,7 +16,7 @@ cluster_color = ""
 
 #Function to handle the command line parameters passed
 def options(argv):
-    if (len(argv) == 0):
+    if len(argv) == 0:
        print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-included_markers=<optional, list of present specific markers to include> : example -> -included_markers=AMY2A,SST,GORASP2\n\t-cluster_id=<optional, name of the column to add as cluster id information from cell_data.csv> : example -> -cluster_id=kmeans\n\t-cluster_color=<optional, name of the column to add as cluster information color from cell_data.csv> : example -> -cluster_color=kmeans_color', flush=True)
        sys.exit()
     else:
@@ -56,8 +55,8 @@ if __name__ =='__main__':
     print(">>> Start time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #Load segmentation data in numpy array format
-    labels = np.load(os.path.join(data_folder, 'analysis/segmentation_data.npy'), allow_pickle=True)
-    df = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
+    labels = np.load(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'), allow_pickle=True)
+    df = pd.read_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'))
 
     markers = []
     #Getting the list of marker names
@@ -85,7 +84,7 @@ if __name__ =='__main__':
     #generating geojson data to import in qupath
     GEOdata = []
     for label in borders:
-        if (label not in df['cell_id'].values):
+        if label not in df['cell_id'].values:
             continue
         cell_row = (df['cell_id'] == label)
         final_coords = borders[label]
@@ -120,7 +119,7 @@ if __name__ =='__main__':
         GEOdata.append(cell_data)
 
     #dump GEOdata variable to json file
-    with open(os.path.join(data_folder, 'analysis/cell_segmentation_geo.json'), 'w') as outfile:
+    with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.json'), 'w') as outfile:
         geojson.dump(GEOdata, outfile)
 
     print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

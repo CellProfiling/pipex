@@ -16,7 +16,6 @@ from scipy.spatial.distance import cdist
 import qnorm
 from combat.pycombat import pycombat
 import json
-import statistics
 
 
 data_folder = os.environ.get('PIPEX_DATA')
@@ -29,7 +28,7 @@ std_norm = "no"
 log_norm = "no"
 quantile_norm = "no"
 batch_corr = ""
-use_bin = "no"
+use_bin = ""
 leiden = "no"
 kmeans = "no"
 elbow = "no"
@@ -43,19 +42,11 @@ max_samples = 200000
 #Function to perform all data filtering, normalization and derived calculations
 def data_calculations():
     #Reading the cell segmentation csv file
-    df_norm = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
+    df_norm = pd.read_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'))
 
-    markers = []
-    #Getting the list of marker names
-    markers = list(df_norm.columns.values)
-    markers = markers[(df_norm.columns.get_loc("y") + 1):]
-    markers = [x for x in markers if "memref" not in x and "_bin" not in x and "_ratio_pixels" not in x and "_local_90" not in x and "leiden" not in x and "kmeans" not in x and "_ref" not in x]
+    markers = analysis_markers
 
-    #If a specific list of markers is informed, we use it
-    if len(analysis_markers) > 0:
-        markers = analysis_markers
-
-    print(">>> List of markers to analyze gathered ",markers," =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    print(">>> List of markers to analyze ",markers," =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     for marker in markers:
         df_norm[marker] = pd.to_numeric(df_norm[marker]).fillna(0)
@@ -95,15 +86,6 @@ def data_calculations():
     if log_norm == 'yes' or std_norm == 'yes':
         print(">>> Markers normalized =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
-    #Alternative normalization via z-score
-    #for marker in markers:
-    #    df_norm[marker] = pd.to_numeric(df[marker])
-    #    if log_norm == 'yes':
-    #        df_norm[marker] = np.log1p(df[marker])
-    #    marker_mean = df_norm[marker].mean()
-    #    marker_std = df_norm[marker].std()
-    #    df_norm[marker] = df_norm[marker].apply(lambda x: (x - marker_mean) / marker_std)
-
     #ComBat batch correction
     if batch_corr != '':
         batch = []
@@ -121,7 +103,7 @@ def data_calculations():
 
         print(">>> Quantile normalization performed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
-    df_norm.to_csv(os.path.join(data_folder, 'analysis/downstream/cell_data_norm.csv'), index=False)
+    df_norm.to_csv(os.path.join(data_folder, 'analysis', 'downstream', 'cell_data_norm.csv'), index=False)
 
     #We calculate and plot the correlations between all markers
     df_corr = df_norm.copy()
@@ -130,20 +112,16 @@ def data_calculations():
     plt.figure()
     fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
     sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
-    plt.savefig(os.path.join(data_folder, 'analysis/downstream/correlation_heatmap.jpg'))
+    plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'correlation_heatmap.jpg'))
     plt.clf()
     plt.close()
 
     #We calculate and plot the dendogram of the correlations clustermap
     plt.figure()
     sns_clustermap = sns.clustermap(df_corr, figsize=(image_size / 100,image_size / 140))
-    plt.savefig(os.path.join(data_folder, 'analysis/downstream/correlation_dendogram.jpg'))
+    plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'correlation_dendogram.jpg'))
     plt.clf()
     plt.close()
-
-    #We mark the zeroes as NaN to calculate mean, std, quartiles, etc... only over the cells that have the marker expressed
-    #for marker in markers:
-    #    df_norm.loc[marker] = np.NaN
 
     columns = ['marker', 'num_cells', 'percent_cells_50+', 'mean', 'median', 'std', 'q10', 'q25', 'q50', 'q75', 'q90'] + markers
 
@@ -166,6 +144,7 @@ def data_calculations():
                 marker_tile = df_norm.loc[(df_norm['x'] > tile_min_x) & (df_norm['y'] > tile_min_y) & (df_norm['x'] <= tile_max_x) & (df_norm['y'] <= tile_max_y)]
 
                 qif[i][j] = marker_tile[marker].sum() / (1844 ** 2)
+
         row = {'marker': marker,
                'num_cells': len(marker_df),
                'percent_cells_50+': (len(marker_df[(marker_df >= 0.5)]) / len(marker_df)) * 100,
@@ -194,11 +173,11 @@ def data_calculations():
     sns_boxplot.set_xticklabels(sns_boxplot.get_xticklabels(), rotation = 45)
     sns_boxplot.set(xlabel=None)
     sns_boxplot.set(ylabel=None)
-    plt.savefig(os.path.join(data_folder, 'analysis/downstream/markers_boxplot.jpg'))
+    plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'markers_boxplot.jpg'))
     plt.clf()
     plt.close()
 
-    df_ext.to_csv(os.path.join(data_folder, 'analysis/downstream/cell_data_markers.csv'), index=False)
+    df_ext.to_csv(os.path.join(data_folder, 'analysis', 'downstream', 'cell_data_markers.csv'), index=False)
     print(">>> Markers information calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     del df_corr
@@ -219,10 +198,10 @@ def fill_surface_html_template(markers, df_norm):
         markers_formatted = markers_formatted + '\"' + marker + '\",'
     markers_formatted = markers_formatted[:-1] + "]"
     html_content = html_content.replace("$$$MARKERS$$$", markers_formatted)
-    minDim = min(min(df_norm['x'].values), min(df_norm['y'].values))
-    maxDim = max(max(df_norm['x'].values), max(df_norm['y'].values))
-    factor = int(maxDim / 100) + 1 if maxDim % 100 > 0 else 0
-    ticktext = [*range(minDim, maxDim, factor * 20)]
+    min_dim = min(min(df_norm['x'].values), min(df_norm['y'].values))
+    max_dim = max(max(df_norm['x'].values), max(df_norm['y'].values))
+    factor = int(max_dim / 100) + 1 if max_dim % 100 > 0 else 0
+    ticktext = [*range(min_dim, max_dim, factor * 20)]
     ticktext_formatted = "["
     for tick in ticktext:
         ticktext_formatted = ticktext_formatted + str(tick) + ','
@@ -238,10 +217,10 @@ def fill_surface_html_template(markers, df_norm):
     z = []
     for marker in markers:
         z.append([])
-    for x in range(minDim, maxDim, factor):
+    for x in range(min_dim, max_dim, factor):
         for m in range(len(markers)):
             z_row = []
-            for y in range(minDim, maxDim, factor):
+            for y in range(min_dim, max_dim, factor):
                 df_cell = df_surface[(df_surface['x'] >= x) & (df_surface['y'] >= y) & (df_surface['x'] < x + factor) & (df_surface['y'] < y + factor)]
                 if df_cell.empty:
                     z_row.append(0)
@@ -259,7 +238,7 @@ def fill_surface_html_template(markers, df_norm):
         z_formatted = z_formatted[:-1] + "],"
     z_formatted = z_formatted[:-1] + "]"
     html_content = html_content.replace("$$$DATA$$$", z_formatted)
-    f = open(os.path.join(data_folder, 'analysis/downstream/markers_surface.html'), 'w')
+    f = open(os.path.join(data_folder, 'analysis', 'downstream', 'markers_surface.html'), 'w')
     f.write(html_content)
     f.close()
 
@@ -412,9 +391,6 @@ def refine_clustering(adata, cluster_type):
 
         clustering_merge_data['scores'][cluster_id] = cluster_merge_clusters_scores
         clustering_merge_data['cell_types'][cluster_id] = []
-#    clustering_merge_data['dif_median_all'] = float(statistics.median(cluster_dif_list_all))
-#    if len(cluster_dif_list_positive) > 0:
-#        clustering_merge_data['dif_median_positive'] = float(statistics.median(cluster_dif_list_positive))
 
     cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
     for index, row in cell_types.iterrows():
@@ -423,25 +399,10 @@ def refine_clustering(adata, cluster_type):
                 cell_type_prob, marker_ranks = check_cell_type(row, cluster_id, clustering_merge_data, row['rank_filter'])
                 if cell_type_prob is not None:
                     curr_final_merging_data = {'cell_type': row['cell_group'] + '.' + row['cell_type'] + '.' + row['cell_subtype'], 'prob': cell_type_prob, 'rank_filter': row['rank_filter'], 'confidence_threshold': row['min_confidence']}
-#                    if row['rank_filter'] == "positive_only":
-#                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif']) + " / " + str(clustering_merge_data['dif_median_positive'])
-#                        cluster_marker_ranks = ""
-#                        for curr_marker_rank in marker_ranks:
-#                            cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
-#                        curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
-#                        if clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] < clustering_merge_data['dif_median_positive']:
-#                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['positive_only']['score_dif'] / clustering_merge_data['dif_median_positive']
-#                            curr_final_merging_data['prob'] = cell_type_prob
-#                        clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
-#                    else:
-#                        curr_final_merging_data['score_vs_median'] = str(clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif']) + " / " + str(clustering_merge_data['dif_median_all'])
                     cluster_marker_ranks = ""
                     for curr_marker_rank in marker_ranks:
                         cluster_marker_ranks = cluster_marker_ranks + curr_marker_rank + ":" + marker_ranks[curr_marker_rank] + ","
                     curr_final_merging_data['marker_ranks'] = cluster_marker_ranks[:-1]
-#                       if clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] < clustering_merge_data['dif_median_all']:
-#                            cell_type_prob = cell_type_prob * clustering_merge_data['scores'][cluster_id]['rank_filter']['all']['score_dif'] / clustering_merge_data['dif_median_all']
-#                            curr_final_merging_data['prob'] = cell_type_prob
                     clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
 
     clustering_merge_data['candidates'] = {}
@@ -465,15 +426,15 @@ def refine_clustering(adata, cluster_type):
     clustering_merge_data["scores"] = OrderedDict(sorted(clustering_merge_data["scores"].items()))
     clustering_merge_data["cell_types"] = OrderedDict(sorted(clustering_merge_data["cell_types"].items()))
     clustering_merge_data["candidates"] = OrderedDict(sorted(clustering_merge_data["candidates"].items()))
-    with open(os.path.join(data_folder, 'analysis/downstream/cell_types_result_' + cluster_type + '.json'), 'w') as outfile:
+    with open(os.path.join(data_folder, 'analysis', 'downstream', 'cell_types_result_' + cluster_type + '.json'), 'w') as outfile:
         json.dump(clustering_merge_data, outfile, indent = 4)
 
 
 #Function to perform different cluster methods
 def clustering(df_norm, markers):
     #We create an anndata object with the data so we can proceed with the clustering analysis using scanpy and squidpy libraries
-    if use_bin == 'yes':
-        adata = sc.AnnData(df_norm.loc[:, [marker + '_bin' for marker in markers]])
+    if use_bin != "":
+        adata = sc.AnnData(df_norm.loc[:, [marker + use_bin for marker in markers]])
     else:
         adata = sc.AnnData(df_norm.loc[:, markers])
     adata.obs_names = 'cell_id_' + df_norm['cell_id'].astype(str)
@@ -514,7 +475,7 @@ def clustering(df_norm, markers):
     plt.clf()
     plt.close()
 
-    if (leiden == 'yes'):
+    if leiden == 'yes':
         #We calculate leiden cluster
         sc.tl.leiden(adata)
         print(">>> Leiden cluster calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
@@ -530,9 +491,9 @@ def clustering(df_norm, markers):
                 print(e)
                 print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
-    if (kmeans == 'yes'):
-        if (elbow == 'yes'):
-            if (len(df_norm.index) <= max_samples):
+    if kmeans == 'yes':
+        if elbow == 'yes':
+            if len(df_norm.index) <= max_samples:
                 #We calculate all kmeans clusters with k 1 to 20 so we can show the elbow method plots
                 print(">>> Performing kmeans elbow method =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 distortions = []
@@ -559,7 +520,7 @@ def clustering(df_norm, markers):
                 plt.xlabel('Values of K')
                 plt.ylabel('Distortion')
                 plt.title('The Elbow Method using Distortion')
-                plt.savefig(os.path.join(data_folder, 'analysis/downstream/elbow_distortion.jpg'))
+                plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'elbow_distortion.jpg'))
                 plt.clf()
                 plt.close()
 
@@ -568,7 +529,7 @@ def clustering(df_norm, markers):
                 plt.xlabel('Values of K')
                 plt.ylabel('Inertia')
                 plt.title('The Elbow Method using Inertia')
-                plt.savefig(os.path.join(data_folder, 'analysis/downstream/elbow_inertia.jpg'))
+                plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'elbow_inertia.jpg'))
                 plt.clf()
                 plt.close()
                 print(">>> Elbow method calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
@@ -592,9 +553,15 @@ def clustering(df_norm, markers):
                 print(e)
                 print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
-    if (leiden == 'yes' or kmeans == 'yes'):
-        df = pd.read_csv(os.path.join(data_folder, 'analysis/cell_data.csv'))
-        if (leiden == 'yes'):
+    if neigh_cluster_id != "":
+        sq.gr.centrality_scores(adata, neigh_cluster_id)
+        sq.pl.centrality_scores(adata, neigh_cluster_id, save=(neigh_cluster_id + "_centrality_scores.jpg"))
+        sq.gr.ripley(adata, cluster_key=neigh_cluster_id, mode="L")
+        sq.pl.ripley(adata, cluster_key=neigh_cluster_id, mode="L", save=(neigh_cluster_id + "_ripleyL.jpg"))
+
+    if leiden == 'yes' or kmeans == 'yes':
+        df = pd.read_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'))
+        if leiden == 'yes':
             df['leiden'] = df['cell_id'].map(adata.obs.set_index('id')['leiden']).astype(str)
             df['leiden'] = df['leiden'].fillna('')
             leiden_color_list = adata.uns['leiden_colors']
@@ -610,19 +577,19 @@ def clustering(df_norm, markers):
             df_norm['leiden'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden']).astype(str)
             df_norm['leiden_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden_color']).astype(str)
 
-            if use_bin == 'yes':
-                df_corr = pd.concat([df[[marker + '_bin' for marker in markers]], pd.get_dummies(df_norm['leiden'], prefix='clusterL')],axis=1).corr()
+            if use_bin != "":
+                df_corr = pd.concat([df[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['leiden'], prefix='clusterL')],axis=1).corr()
             else:
                 df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['leiden'], prefix='clusterL')], axis=1).corr()
 
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
             sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
-            plt.savefig(os.path.join(data_folder, 'analysis/downstream/leiden_clusters_correlation_heatmap.jpg'))
+            plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'leiden_clusters_correlation_heatmap.jpg'))
             plt.clf()
             plt.close()
 
-        if (kmeans == 'yes'):
+        if kmeans == 'yes':
             #We add to the original cell segmentation csv file the calculated kmeans group for each cell
             df['kmeans'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans']).astype(str)
             df['kmeans'] = df['kmeans'].fillna('')
@@ -639,31 +606,31 @@ def clustering(df_norm, markers):
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
             df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
 
-            if use_bin == 'yes':
-                df_corr = pd.concat([df[[marker + '_bin' for marker in markers]], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')],axis=1).corr()
+            if use_bin != "":
+                df_corr = pd.concat([df[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')],axis=1).corr()
             else:
                 df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
 
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
             sns_heatmap = sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":5}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = False, linewidths=.1, cbar=False, ax=ax1)
-            plt.savefig(os.path.join(data_folder, 'analysis/downstream/kmeans_clusters_correlation_heatmap.jpg'))
+            plt.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'kmeans_clusters_correlation_heatmap.jpg'))
             plt.clf()
             plt.close()
 
-        df.to_csv(os.path.join(data_folder, 'analysis/cell_data.csv'), index=False)
-        df_norm.to_csv(os.path.join(data_folder, 'analysis/downstream/cell_data_norm.csv'), index=False)
-        adata.write(os.path.join(data_folder, 'analysis/downstream/anndata.h5ad'))
+        df.to_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'), index=False)
+        df_norm.to_csv(os.path.join(data_folder, 'analysis', 'downstream', 'cell_data_norm.csv'), index=False)
+        adata.write(os.path.join(data_folder, 'analysis', 'downstream', 'anndata.h5ad'))
 
 #Function to handle the command line parameters passed
 def options(argv):
-    if (len(argv) == 0):
-       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, yes or no to use binarized columns for clustering> : example -> -use_bin=no\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on> : example -> -neigh_cluster_id=kmeans_ref', flush=True)
+    if len(argv) == 0:
+       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, suffix for the markers to use as input columns for the analysis>: example -> -use_bin=_local_90\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, name of the cluster column to use to perform the neigborhood analysis upon>: example -> -neigh_cluster_id=kmeans', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, yes or no to use binarized columns for clustering> : example -> -use_bin=no\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on> : example -> -neigh_cluster_id=kmeans_ref', flush=True)
+                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, suffix for the markers to use as input columns for the analysis>: example -> -use_bin=_local_90\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, name of the cluster column to use to perform the neigborhood analysis upon>: example -> -neigh_cluster_id=kmeans', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
@@ -673,7 +640,7 @@ def options(argv):
                 image_size = int(arg[12:])
             elif arg.startswith('-analysis_markers='):
                 global analysis_markers
-                analysis_markers = arg[18:].split(",")
+                analysis_markers = [x.strip() for x in arg[18:].split(",")]
             elif arg.startswith('-cellsize_max='):
                 global cellsize_max
                 cellsize_max = int(arg[14:]) / 100.0
@@ -735,12 +702,12 @@ if __name__ =='__main__':
     print(">>> Start time analysis =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     try:
-        os.mkdir(os.path.join(data_folder, 'analysis/downstream'))
+        os.mkdir(os.path.join(data_folder, 'analysis', 'downstream'))
     except OSError as error:
         print('>>> analysis/downstream folder already exists, overwriting results', flush=True)
 
     #Saving general settings for libraries
-    sc.settings.figdir= os.path.join(data_folder, 'analysis/downstream')
+    sc.settings.figdir= os.path.join(data_folder, 'analysis', 'downstream')
     sc.settings.set_figure_params(format='jpg',figsize=(image_size / 100, image_size / 100))
     plt.rcParams['figure.dpi'] = 200
     sns.set(font_scale=0.6)
