@@ -57,6 +57,10 @@ def batch_processor():
             #using the run_id provided by the user
             run_id = curr_command.replace('run_id', '').strip()
             print(">>> Setting run_id =",run_id, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        elif curr_command.startswith('max_res'):
+            #setting PIPEX_MAX_RESOLUTION environment variable
+            os.environ["PIPEX_MAX_RESOLUTION"] = curr_command.replace('max_res', '').strip()
+            print(">>> Setting max resolution to =",os.environ["PIPEX_MAX_RESOLUTION"], datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         elif curr_command.startswith('swap'):
             #creating required swap via bash script 'enable_swap.sh'
             print(">>> Creating swap space =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

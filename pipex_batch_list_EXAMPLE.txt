@@ -4,12 +4,14 @@ swap 8
 
 #running ESPACE experiment 3
 
-segmentation.py -data=/home/annamc/pipeline/data -nuclei_marker=DAPI1 -nuclei_diameter=20 -nuclei_expansion=20 -membrane_marker=CDH1 -membrane_diameter=25 -adjust_images=yes -measure_markers=DAPI1,CDH1,HLA-DR,CHGA,KRT5,IAPP,ACTA2,GORASP2,EZR,SST,TUFM,S100B,HSP90B1,Ki67,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG
+segmentation.py -data=/home/lab/pipeline/data -nuclei_marker=DAPI -nuclei_diameter=20 -nuclei_expansion=20 -membrane_marker=CDH1 -membrane_diameter=25 -measure_markers=DAPI,CDH1,HLA-DR,CHGA,KRT5,IAPP,ACTA2,GORASP2,EZR,SST,TUFM,S100B,HSP90B1,Ki67,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG
 
-analysis.py -data=/home/annamc/pipeline/data -image_size=1000
+analysis.py -data=/home/lab/pipeline/data -analysis_markers=HLA-DR,CHGA,KRT5,IAPP,ACTA2,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG -image_size=2000 -leiden=yes
 
-#need full QuPath integration, with cluster
+#need full TissUUmaps integration, with cluster
 
-generate_geojson.py -data=/home/annamc/pipeline/data -expand=yes
+generate_geojson.py -data=/home/lab/pipeline/data -expand=yes
+
+generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -compress_geojson=yes -include_html=yes
 
 

@@ -18,6 +18,8 @@ Key features
   - Generates the selected results and plots for all the markers, storing them accordingly. 
 - **Batch mode**
   - PIPEX can process sequentially different CODEX experiments with different configurations of all the above options
+- **Embedded integrations**
+  - Additional PIPEX steps produce geojson files to easy integrate the results in QuPath and TissUUmaps, filter/tiling the segmentation to work with Leica's LMD, etc... 
 
 
 
@@ -26,9 +28,9 @@ Why PIPEX
 
   - Written entirely in python language, not tied to any specific program that might change and/or be discontinued in the future. Not even really tied to CODEX, can process any arbitrary set of images in a folder! 
   - More accurate cell segmentation compared to regular Stardist if a good membrane marker is provided.
-  - PIPEX's generic results can be easily imported to other more graphical o interactive programs. As examples, PIPEX already includes a script to import the cell segmentation (and clusters, if calculated) to QuPath, a post-filtering option to adapt the mask to BIAS, etc...
+  - PIPEX's generic results can be easily imported to other more graphical o interactive programs. As examples, PIPEX already includes a script to import the cell segmentation (and clusters, if calculated) to QuPath, a post-filtering option to adapt the mask to Leica's LMD, etc...
   - The broad scope of the implemented downstream analysis automatically generates a large amount of labelled plots and data that can provide unexpected insights or be easily discarded otherwise.
-  - Memory efficient, 10k resolution images can be handled by a 16GB regular machine without GPU. Virtually no size limit in linux through automatic swap memory management.
+  - Memory efficient, 10k resolution images can be handled by a 16GB regular machine without GPU. Virtually no size limit in linux through automatic swap memory management and/or if you enforce a maximum resolution which PIPEX will use to automatically downscale the images.
   - Quite fast: a full CODEX run of 20 antibodies with 6k resolution images takes 10min to fully process by PIPEX in 16Gb laptop (4min segmentation | 2min analysis | 1min QuPath conversion | 1min mask post-filtering).
 
   
@@ -57,18 +59,19 @@ Installation
 - Unzip the contents of the `pipex.zip` inside your virtual environment directory
   - Following the example above, you should end having a bunch of files (`pipex.py`, `pipex_process.py`, etc...) in the folder `/home/lab/sandbox/pipex`
 - Navigate to your virtual environment directory and run it:
-  - Example: `source bin/activate`
+  - Example: `source bin/activate` (linux) or `Scripts\activate.bat` (windows)
 - Install all requirements through pip:
   - Example: `pip install -r requirements.txt`
 - Profit!
 
 [Note] a docker image is also provided. Just remember to configure the environment variable for PIPEX's "work" directory.
-[Note] if you are installing PIPEX in your own laptop you might need some other packages/libraries. Please install these:
+[Note] if you are installing PIPEX in your own linux laptop you might need some other packages/libraries. Please install these:
 - `sudo apt-get install python3.11-dev`
 - `sudo apt-get install libvips`
 - `sudo apt-get install -y python3-opencv`
 - `sudo apt-get install -y gcc`
 - `sudo apt-get install python3-tk`
+
 
 
 Running PIPEX
@@ -77,7 +80,7 @@ Running PIPEX
 **NOTE**: remember that you have to access your PIPEX virtual environment before running any PIPEX script! To do so, navigate to your PIPEX working directory and activate it.
  - Example:
    - `cd /home/lab/sandbox`
-   - `source bin/activate`
+   - `source bin/activate` (linux) or `Scripts\activate.bat` (windows)
 
 **Source images**
 
@@ -88,6 +91,9 @@ The images in the data folder must reside in the base level (no sub-folders allo
 *Example 1*: data folder created in {home}/pipeline/data with several images
 
 ![Example 1](./doc/doc1.jpg "Example 1")
+
+**NOTE**: if you plan to use TissUUmaps integration, it requires your images to be in `TIFF` format and be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
+
 <div style="page-break-after: always;"></div>
 
 
@@ -101,6 +107,19 @@ There are currently available the following commands:
 
 - `swap <number of GB>` : Linux only, it will generate a temporary swap space in the installation folder with the specified size; the space will be automatically deleted at the end of the full PIPEX process. **OBS**: it will require root permission/password while executing.
 
+- `max_res <number of pixels on the largest axis>` : it will instruct PIPEX to downscale any image with width or height pixel resolution larger than the specified value for the purpose of preprocessing and segmentation calculations. **OBS**: the results will be automatically upscaled accordingly to your original images size.
+  
+- `preprocessing.py` : preprocesses the images to try to fix common microscope acquisition problems. It can remove lower and/or upper intensities (background and/or artifacts), increase the exposure and/or generate a heat map. If the image suffers from severe tiling, preprocessing can try to help in different ways: reducing light gradients in each tile, homogenize the intensities of all the tiles and/or smooth the tile cuts. [NOTE] if more than one image is provided in the data folder, preprocessing will calculate all transforming operations in the first file and apply them equally in the rest of them; this is useful to modify proportionally all markers/channels present in the same original microscope image, which will most probably suffer of the same light/intensity problems.
+  - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
+  - `-threshold_min=<number, percentage of intensity>` : example -> -threshold_min=1. **OBS**: this is minimum percentage of the global intensity (the image limit) from which all intensities below will be deleted.
+  - `-threshold_max=<number, percentage of intensity>` : example -> -threshold_min=99. **OBS**: this is maximum percentage of the global intensity (the image limit) from which all intensities above will be deleted.
+  - `-otsu_threshold_levels=<otsu classes, i.e 3 OR otsu classes and specific bin filtering, i.e 5:1:2>` : example -> -otsu_threshold_levels=3 **OBS**: this is the number of otsu thresholds to use while processing the image and the two ones selected as main intervals. If you use 0 it will default to 3:1:2 but provide a sample of many otsu intervals as output files.
+  - `-balance_tiles=<yes or no>` : example -> -balance_tiles=yes. **OBS**: this activates the option to try to homogenize the intensities of all the tiles
+  - `-tile_size=<number of pixels>` : example -> -tile_size=1844. **OBS**: this is the size of the image square tiles
+  - `-light_gradient=<number, factor of complexity of light issues [1 to 4 should be enough]>` : example -> -light_gradient=3. **OBS**: this is the exponential value of squared sub-tiles that will be used to try to reduce the light gradients in each tile.
+  - `-stitch_size=<number of pixels>` : example -> -stitch_size=20. **OBS**: this specifies the width of the region to use while performing the smooth operation in the tile cuts
+  - `-exposure=<number, percentage of the base intensity>` : example -> -exposure=150. **OBS**: this increases the exposure of the image once it has been preprocessed
+
 - `segmentation.py` : performs PIPEX segmentation. Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
   - `-nuclei_marker=<name before . in image file>` : example, from image filename "reg001_cyc001_ch001_DAPI.tif"-> -nuclei_marker=DAPI
@@ -113,20 +132,21 @@ There are currently available the following commands:
   - `-membrane_diameter=<optional, number of pixels>` : example -> -membrane_diameter=25. **OBS**: required if membrane marker is used, this is an approximate guideline, the custom watershed segmentation is smart enough to adapt.
   - `-membrane_compactness=<optional, "squareness" of the membrane, gradation between 0.001 and 0.999>` : example -> -membrane_compactness=0.5. **OBS**: required if membrane marker is used, this instructs the watershed algorithm to try to keep a more or less (bigger value is more) square-type segmentation.
   - `-membrane_keep=<yes or no to keep segmented membranes without nuclei>` : example -> -membrane_keep=no. **OBS**: this will keep detected membrane segmentations without an underlying nuclei; useful for nuclei shapes not properly segmented by Stardist
-  - `-custom_segmentation=<optional, file path to a pre-made custom segmentation>` : example -> -custom_segmentation=/data/custom_seg.npy. **OBS**: accepts segmentations in numpy array or image mask file formats. This ignores all the previous segmentation parameters, using this custom segmentation for measuring the markers. Understand that many generated output files will not exists
+  - `-custom_segmentation=<optional, file path to a pre-made custom segmentation>` : example -> -custom_segmentation=/data/custom_seg.npy. **OBS**: accepts segmentations in numpy array or image mask file formats. Depending on your choice for the next parameter, `custom_segmentation_type`, this will ignores some/all the previous segmentation parameters, using this custom segmentation for measuring the markers. Understand that many generated output files will not exist
+  - `-custom_segmentation_type=<optional, full | nuc | mem value to indicate the type of the custom segmentation attached>` : example -> -custom_segmentation_type=full. **OBS**: required if you are using a custom segmentation. Depending on your choice, PIPEX will plug-in your segmentation a the proper step (i.e. `nuc` will replace the Stardist segmentation part with your custom segmentation, but will then refine it with a membrane marker if so you have chonsen in your paramters)
   - `-measure_markers=<list of markers names before . in image files>` : example -> measure_markers=DAPI,CDH1,AMY2A,SST,GORASP2.
 
 - `analysis.py` : performs PIPEX broad scope analysis. MUST be run AFTER a segmentation. Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
-  - `-image_size=<optional, one-side approximate resolution>` : example -> -image_size=1000. **OBS**: this refers to the resulting plot images' approximate resolution in pixels
   - `-analysis_markers=<optional, list of present specific markers to analyze>` : example -> -analysis_markers=AMY2A,SST,GORASP2. **OBS**: if this is not set, the analysis will use all present markers
+  - `-image_size=<optional, one-side approximate resolution>` : example -> -image_size=1000. **OBS**: this refers to the resulting plot images' approximate resolution in pixels
+  - `-use_bin=<optional, suffix for the markers to use as input columns for the analysis>` : example -> -use_bin=_local_90. **OBS**: this will use the associated binarized columns for each stated marker ([name of the marker] + use_bin) to calculate the selected clustering methods.
   - `-cellsize_max=<optional, percentage of biggest cells to remove>` : example -> -cellsize_max=5. **OBS**: this refers to the percentge of the biggest cells to be remove for all analysis results
   - `-cellsize_min=<optional, percentage of smallest cells to remove>` : example -> -cellsize_min=5. **OBS**: this refers to the percentge of the smallest cells to be remove for all analysis results
   - `-custom_filter=<optional, yes or no to apply custom Cell Profiling lab's biomarkers filtering>` : example -> -custom_filter=yes. **OBS**: this will filter known biomarkers following Cell Profiling lab common tweaks.
   - `-log_norm=<optional, yes or no to apply log n + 1 normalization>` : example -> -log_norm=yes. **OBS**: this will apply a log1p normalization to the markers intensities
   - `-std_norm=<optional, yes or no to apply 0 to 1 re-scale normalization>` : example -> -std_norm=yes. **OBS**: this will apply a standard normalization to the markers intensities
   - `-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by>` : example -> -batch_corr=batch_id. **OBS**: this is the name of the column in the cell_data.csv that differentiates each experiment batch, so they can be separated to perform ComBat batch correction.
-  - `-use_bin=<optional, suffix for the markers to use as input columns for the analysis>` : example -> -use_bin=_local_90. **OBS**: this will use the associated binarized columns for each stated marker ([name of the marker] + use_bin) to calculate the selected clustering methods.
   - `-quantile_norm=<optional, yes or no to apply quantile normalization>` : example -> -quantile_norm=yes. **OBS**: this will apply an additional quantile normalization to the markers intensities
   - `-leiden=<optional, yes or no to perform leiden clustering>` : example -> -leiden=yes. **OBS**: this will perform a leiden clustering and all its associated data and plots
   - `-kmeans=<optional, yes or no to perform kmeans clustering>` : example -> -kmeans=yes. **OBS**: this will perform a kmeans clustering and all its associated data and plots.
@@ -151,18 +171,6 @@ There are currently available the following commands:
   - `-tile_relabel=<yes or no to relabel sequentially the tile segments>` : example -> -tile_relabel=no. **OBS**: special option to have the segments of each tile relabeled sequentially, which may be useful to have possible unique identifiers per tile
   - `-extend_tile=<yes or no to have bigger border tiles>` : example -> -extend_tile=no. **OBS**: special option to have the last right and bottom border tile of the image extended to reach their limit if the image length and width does not match an exact tile size multiplier
   
-- `preprocessing.py` : [BETA] preprocesses the images to try to fix common microscope acquisition problems. It can remove lower and/or upper intensities (background and/or artifacts), increase the exposure and/or generate a heat map. If the image suffers from severe tiling, preprocessing can try to help in different ways: reducing light gradients in each tile, homogenize the intensities of all the tiles and/or smooth the tile cuts. [NOTE] if more than one image is provided in the data folder, preprocessing will calculate all transforming operations in the first file and apply them equally in the rest of them; this is useful to modify proportionally all markers/channels present in the same original microscope image, which will most probably suffer of the same light/intensity problems.
-  - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
-  - `-threshold_min=<number, percentage of intensity>` : example -> -threshold_min=1. **OBS**: this is minimum percentage of the global intensity (the image limit) from which all intensities below will be deleted.
-  - `-threshold_max=<number, percentage of intensity>` : example -> -threshold_min=99. **OBS**: this is maximum percentage of the global intensity (the image limit) from which all intensities above will be deleted.
-  - `-balance_tiles=<yes or no>` : example -> -balance_tiles=yes. **OBS**: this activates the option to try to homogenize the intensities of all the tiles
-  - `-tile_size=<number of pixels>` : example -> -tile_size=1844. **OBS**: this is the size of the image square tiles
-  - `-bright_levels=<number, main levels of intensity in the image [normally 3-5 and their 2 selected focus]>` : example -> -bright_levels=4:1:3. **OBS**: this is the number of otsu thresholds to use while processing the image and the two ones selected as main intervals. If you use 0 it will default to 3:1:2 but provide a sample of many otsu intervals as output files.
-  - `-light_gradient=<number, factor of complexity of light issues [1 to 4 should be enough]>` : example -> -light_gradient=3. **OBS**: this is the exponential value of squared sub-tiles that will be used to try to reduce the light gradients in each tile.
-  - `-stitch_size=<number of pixels>` : example -> -stitch_size=20. **OBS**: this specifies the width of the region to use while performing the smooth operation in the tile cuts
-  - `-exposure=<number, percentage of the base intensity>` : example -> -exposure=150. **OBS**: this increases the exposure of the image once it has been preprocessed
-  - `-heat_map=<yes or no>` : example -> -heat_map=yes. **OBS**: this generates a heat_map of the preprocessed image
-  
 - `generate_tissuumaps.py` : generates TissUUmaps project for interactive visualization and quality control of the downstream analysis and cell segmentation. Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
   - `-include_marker_images=<yes or no or list of present specific markers to display as image layers>` : example -> -include_marker_images=DAPI,SST,GORASP2. **OBS**: this includes the specified markers as image layers in the TissUUmaps project. If this is not set, no image layers will be included
@@ -179,15 +187,15 @@ There are currently available the following commands:
 
     #running ESPACE experiment 3
 
-    segmentation.py -data=/home/lab/pipeline/data -nuclei_marker=DAPI -nuclei_diameter=20 -nuclei_expansion=20 -membrane_marker=CDH1 -membrane_diameter=25 -adjust_images=yes -measure_markers=DAPI,CDH1,HLA-DR,CHGA,KRT5,IAPP,ACTA2,GORASP2,EZR,SST,TUFM,S100B,HSP90B1,Ki67,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG
+    segmentation.py -data=/home/lab/pipeline/data -nuclei_marker=DAPI -nuclei_diameter=20 -nuclei_expansion=20 -membrane_marker=CDH1 -membrane_diameter=25 -measure_markers=DAPI,CDH1,HLA-DR,CHGA,KRT5,IAPP,ACTA2,GORASP2,EZR,SST,TUFM,S100B,HSP90B1,Ki67,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG
 
-    analysis.py -data=/home/lab/pipeline/data -image_size=1000 -leiden=yes
+    analysis.py -data=/home/lab/pipeline/data -analysis_markers=HLA-DR,CHGA,KRT5,IAPP,ACTA2,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG -image_size=2000 -leiden=yes
 
-    #need full QuPath integration, with cluster
+    #need full TissUUmaps integration, with cluster
 
     generate_geojson.py -data=/home/lab/pipeline/data -expand=yes
 
-    generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -compress_geojson -include_html=yes
+    generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -compress_geojson=yes -include_html=yes
 </code>
 
 
@@ -199,6 +207,9 @@ Once you have written in `pipex_batch_list.txt` the commands to be sequentially 
 
 This will generate the following sub-folders and items inside the data folder:
 
+- `preprocessed` folder: it contains the following items:
+  - Same image file: the preprocessed resulting image.
+  - Several image files: these are other image generated by the preprocessing step, including heat maps.
 - `analysis` folder: it contains the following items:
   - `segmentation_data.npy` file: the labelled cell regions in numpy array format (for further computing analysis)
   - `segmentation_data_filtered.npy` file: the filtered labelled cell regions in numpy array format (if you have executed the generate_filtered_masks step)
@@ -219,13 +230,11 @@ This will generate the following sub-folders and items inside the data folder:
   - `anndata_TissUUmaps.h5ad`: TissUUmaps project file. **OBS** this file will only be present if you have run the generate_tissuumaps command)
 - `analysis/quality_control` folder: it contains the following items:
   - Several image files: these are image representations of intermediate steps of the cell segmentation process. Useful as post-verification and/or to refine the parameters if the result is not what you expected.
-- `preprocessed` folder: it contains the following items:
-  - Same image file: the preprocessed resulting image.
-  - Several image files: these are other image generated by the preprocessing step, including heat maps.
 
 **Implicit batch mode**
 
 Remember that nothing prevents you to run several different experiments by using different data folders in the command list introduced in `pipex_batch_list.txt`!
+
 
 
 PIPEX GUI
@@ -233,12 +242,12 @@ PIPEX GUI
 
 PIPEX offer a simple and easy GUI to run single experiments. It does not offer multiple data folders configurations, but it's flexible enough to configure your pipeline with all available steps and parameters. To open the GUI just type in your PIPEX's virtual environment:
 
-`sh pipex.sh`
+`sh pipex.sh` (linux) or `python pipexGUI.py` (windows)
 
 **NOTE**: remember that you have to access your PIPEX virtual environment before running any PIPEX script! To do so, navigate to your PIPEX working directory and activate it.
  - Example:
    - `cd /home/lab/sandbox`
-   - `source bin/activate`
+   - `source bin/activate` (linux) or `Scripts\activate.bat` (windows)
 
 ![PIPEX GUI](./doc/doc30.jpg "PIPEX GUI")
 
@@ -267,7 +276,8 @@ If you add the `generate_tissuumaps` command to PIPEX command list a `anndata_Ti
 
 If you add the `include_html=yes` parameter to the `generate_tissuumaps` command, a `TissUUmaps_webexport` folder will be generated in your analysis/downstream sub-folder. You can share this file on a web server, and access it from any web browser.
 
-**NOTE**: TissUUmaps requires your images to be in `TIFF` format and be name exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
+**NOTE**: TissUUmaps requires your images to be in `TIFF` format and be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
+
 
 
 Pipeline integration
@@ -277,6 +287,7 @@ PIPEX can be integrated as a step in a bigger pipeline or queue.
  - By default, a random `run_id` is assigned to every PIPEX operations batch and a file named `LAST_RUN_ID` containing the same identifier is generated in the root folder once the process is finished.
  - You can add a file in the root folder named `run_id.txt` containing a specific identifier if you want to force PIPEX to use it for the next run. The `LAST_RUN_ID` file will be updated accordingly when the process is finished.
  - You can also directly specify a run identifier by the PIPEX command `run_id`
+
 
 
 Annex 1: Detailed segmentation explanation
@@ -373,6 +384,7 @@ See different possible outcomes for several parameters over the same sample:
 ![PIPEX segmentation 4](./doc/doc14.jpg "PIPEX segmentation 4")
 
 
+
 Annex 2: Detailed preprocessing explanation
 -------------------------------------------
 
@@ -386,27 +398,27 @@ Preprocessing offers, at high level, the following options (in order):
     - *Stitch smoothing*: smooth the area around the tile cuts.
   - *Exposure*: enhance or decrease in percentage the final intensities of the image.
 
-Through a combination of these techniques (which can be easily tried and re-tried with PIPEX's configurable nature), problematic images can be salvaged and/or improved for further analysis. Some examples with their chosen parameters are shown below:
+Through a combination of these techniques (which can be easily tried and re-tried with PIPEX's configurable nature), problematic images can be salvaged and/or improved for further analysis. Some examples are shown below:
 
 ![Image example 1](./doc/doc20.jpg "Image example 1")
 ![PIPEX preprocessing 1](./doc/doc21.jpg "PIPEX preprocessing 1")
 
-*Gradient lights and unbalanced tiles. Preprocessed with -threshold_min=1 -threshold_max=100 -exposure=100 -heat_map=no -tile_size=1844 -bright_levels=3 -flatten_spots=no -light_gradient=3 -balance_tiles=yes -stitch_size=40*
-<div style="page-break-after: always;"></div>
+*Gradient lights and unbalanced tiles. Preprocessed with -threshold_min=1 -threshold_max=100 -otsu_threshold_levels=3 -exposure=100 -tile_size=1844 -flatten_spots=no -light_gradient=3 -balance_tiles=yes -stitch_size=40*
 
 ![Image example 2](./doc/doc22.jpg "Image example 2")
 ![PIPEX preprocessing 2](./doc/doc23.jpg "PIPEX preprocessing 2")
 
-*Heavy background and unbalanced tiles. Preprocessed with -threshold_min=3 -threshold_max=100 -exposure=100 -heat_map=no -tile_size=1844 -bright_levels=3 -flatten_spots=no -light_gradient=1 -balance_tiles=yes -stitch_size=40*
+*Heavy background and unbalanced tiles. Preprocessed with -threshold_min=3 -threshold_max=100 -otsu_threshold_levels=3 -exposure=100 -tile_size=1844 -flatten_spots=no -light_gradient=1 -balance_tiles=yes -stitch_size=40*
 <div style="page-break-after: always;"></div>
 
 ![Image example 3](./doc/doc24.jpg "Image example 3")
 ![PIPEX preprocessing 3](./doc/doc25.jpg "PIPEX preprocessing 3")
 
-*Very damaged image: background signal, shifting gradient lights, very unbalanced tiles, precipitates, etc... Preprocessed with -threshold_min=7 -threshold_max=100 -exposure=100 -heat_map=no -tile_size=1844 -bright_levels=4:1:3 -flatten_spots=yes -light_gradient=3 -balance_tiles=yes -stitch_size=40*
+*Very damaged image: background signal, shifting gradient lights, very unbalanced tiles, precipitates, etc... Preprocessed with -threshold_min=7 -threshold_max=100 -otsu_threshold_levels=4:1:3 -exposure=100 -tile_size=1844 -flatten_spots=yes -light_gradient=3 -balance_tiles=yes -stitch_size=40*
 <div style="page-break-after: always;"></div>
 
 There's a full [presentation](https://github.com/CellProfiling/pipex/blob/main/doc/preprocessing_presentation.zip) about PIPEX's preprocessing technique available. Just download it and open `preprocessing_presentation.html` in your browser.
+
 
 
 Annex 3: Custom Cell Profiling lab analysis filtration
@@ -421,6 +433,7 @@ PIPEX's analysis step includes an optional marker filtration commonly used in Ce
 Please make sure you the name of your marker column is a strict match with the aforementioned ones
 
 
+
 Annex 4: Cluster refinement procedure
 -------------------------------------
 
@@ -432,7 +445,7 @@ To use the cluster refinement, you have to create a `cell_types.csv` file with r
 - `cell_group`: used as a prefix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
 - `cell_type`: used as a interfix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
 - `cell_subtype`: used as a suffix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
-- `rank_filter`: used to direct the refinement procedure to use only certain ranked genes. Default is `all` (no filtering), you can use `positive_only` (use only ranked genes with positive values)
+- `rank_filter`: used to direct the refinement procedure to use only certain ranked genes. Default is `all` (no filtering, but all rule markers must be present in the cluster class ranked genes), you can use `positive_only` (all rule markers must be present in the cluster class ranked genes and will enforce the usage of only the ones with positive values) or `none` (no filtering, rule markers may not present in the cluster class ranked genes)
 - `min_confidence`: by default, the refinement procedure aggresively merges all clusters that minimally fullfil the indicated rules. You can force the process to be more strict by using a higher `min_confidence` probability (values from 0 to 100)
 - `marker[n]` and `rule[n]` pairs: you can add an arbritary amount (at least one!) of marker rules to guide the algorithm how to annotate/merge the automatically discovered clusters. The marker value must match one of your analysis markers and the rule states how the marker should be relatively placed amongst the ranked genes (values `high`,`medium`,`low`)
 
