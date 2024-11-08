@@ -128,9 +128,9 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
         sd_labels_expanded = custom_img_orig
 
     affected_by_membrane = set()
-    if custom_segmentation == "" or custom_segmentation_type != "mem":
-        #if membrane marker is provided, run custom watershed segmentation
-        if membrane_diameter > 0:
+    if membrane_diameter > 0 or custom_segmentation_type == "mem":
+        if custom_segmentation == "" or custom_segmentation_type != "mem":
+            #if membrane marker is provided, run custom watershed segmentation
             #normalizing images
             membrane_img = (membrane_img_orig - np.amin(membrane_img_orig)) / (np.amax(membrane_img_orig) - np.amin(membrane_img_orig))
 
@@ -242,6 +242,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                                         sd_labels_expanded[row + tile_x][column + tile_y] = 0
                                         if exp_label > 0:
                                             affected_by_membrane.add(exp_label)
+
         else:
             ws_labels = custom_img_orig
             # merge resulting segments so they don't cut nuclei (not expanded)
@@ -277,8 +278,10 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                         continue
                     ws_labels[row][column] = ws_regions_merged[ws_labels[row][column]]
 
-            imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_result_merged_by_nuclei.jpg"), np.uint8(mark_boundaries(nuclei_img_orig, ws_labels) * 255))
-            print(">>> Watershed preliminary nuclei filter result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+            imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_result_merged_by_nuclei.jpg"),
+                   np.uint8(mark_boundaries(nuclei_img_orig, ws_labels) * 255))
+            print(">>> Watershed preliminary nuclei filter result image saved =",
+                  datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
             # cut expanded nuclei that collide with watershed segments
             for row in range(len(ws_labels)):
