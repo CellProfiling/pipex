@@ -125,7 +125,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
         else:
             sd_labels_expanded = sd_labels
     else:
-        sd_labels_expanded = custom_segmentation
+        sd_labels_expanded = custom_img_orig
 
     affected_by_membrane = set()
     if custom_segmentation == "" or custom_segmentation_type != "mem":
@@ -243,7 +243,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                                         if exp_label > 0:
                                             affected_by_membrane.add(exp_label)
         else:
-            ws_labels = custom_segmentation
+            ws_labels = custom_img_orig
             # merge resulting segments so they don't cut nuclei (not expanded)
             ws_regions = {}
             for row in range(len(ws_labels)):
