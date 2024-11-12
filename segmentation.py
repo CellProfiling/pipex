@@ -486,24 +486,6 @@ if __name__ =='__main__':
                 next_try = True
 
             if next_try:
-                next_try = False
-                try:
-                    if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                        curr_image = imread(file_path)
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        nuclei_img = downscale_images(curr_image)
-                    if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                        curr_image = imread(file_path)
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        curr_image = curr_image[:, :, 0]
-                        membrane_img = downscale_images(curr_image)
-                except Exception as e:
-                    next_try = True
-                    print('>>> ', e, flush=True)
-
-            if next_try:
                 try:
                     if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
                         curr_image = np.array(PIL.Image.open(file_path))
@@ -576,20 +558,6 @@ if __name__ =='__main__':
             print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
             print('>>> ', e, flush=True)
             next_try = True
-
-        if next_try:
-            next_try = False
-            try:
-                for marker in measure_markers:
-                    if marker + '.' in file:
-                        curr_image = imread(file_path)
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        marker_calculation(marker, downscale_images(curr_image), cellLabels, data_table)
-                        break
-            except Exception as e:
-                next_try = True
-                print('>>> ', e, flush=True)
 
         if next_try:
             try:

@@ -498,21 +498,6 @@ if __name__ =='__main__':
             next_try = True
 
         if next_try:
-            next_try = False
-            try:
-                for marker in preprocess_markers:
-                    if marker + '.' in file:
-                        curr_image = imread(file_path)
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                            preprocess_image(marker, downscale_images(curr_image))
-                            upscale_results(marker)
-                        break
-            except Exception as e:
-                next_try = True
-                print('>>> ', e, flush=True)
-
-        if next_try:
             try:
                 for marker in preprocess_markers:
                     if marker + '.' in file:
