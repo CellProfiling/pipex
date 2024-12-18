@@ -22,7 +22,7 @@ squidpy==1.4.1
 stardist==0.8.5
 tensorflow==2.15.0
 tifffile==2022.8.12
-TissUUmaps==3.2.0.3
+TissUUmaps==3.2.1.11
 lxml==5.1.0
 hilbertcurve==2.0.5
 py-lmd==1.0.0
