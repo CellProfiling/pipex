@@ -370,7 +370,7 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
         cell_image = cell_image[(cell_image != 0) & (~np.isnan(cell_image))]
         data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image, 0.9) if len(cell_image) > 0 else 0
         data_table[cell.label][marker + '_ratio_pixels'] = np.count_nonzero(cell_image >= cell_binarized_threshold) / cell.area
-        data_table[cell.label][marker + '_otsu3_bin'] = 1.0 + ((cell.intensity_mean - marker_img_min) / (marker_img_max - marker_img_min)) - cell_binarized_threshold
+        data_table[cell.label][marker + '_otsu3'] = 1.0 + ((cell.intensity_mean - marker_img_min) / (marker_img_max - marker_img_min)) - cell_binarized_threshold
 
     print(">>> Marker " + marker + " calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
@@ -580,7 +580,7 @@ if __name__ =='__main__':
     for marker in measure_markers:
         binarized_marker_columns.append(marker + "_local_90")
         binarized_marker_columns.append(marker + "_ratio_pixels")
-        binarized_marker_columns.append(marker + "_bin")
+        binarized_marker_columns.append(marker + "_otsu3")
     measure_markers.extend(binarized_marker_columns)
     measure_markers.insert(0, 'memref')
     measure_markers.insert(0, 'eccentricity')
