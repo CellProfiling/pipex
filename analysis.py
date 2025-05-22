@@ -485,8 +485,12 @@ def clustering(df_norm, markers):
 
         if refine_clusters == "yes":
             try:
-                refine_clustering(adata, 'leiden')
-                calculate_cluster_info(adata, "leiden_ref")
+                cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
+                if set(['cell_group', 'cell_type', 'cell_subtype', 'rank_filter', 'min_confidence']).issubset(set(cell_types.columns.tolist())) :
+                    refine_clustering(adata, 'leiden')
+                    calculate_cluster_info(adata, "leiden_ref")
+                else:
+                    print(">>> cell_types.csv is malformed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             except Exception as e:
                 print(e)
                 print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
@@ -547,8 +551,12 @@ def clustering(df_norm, markers):
 
         if refine_clusters == "yes":
             try:
-                refine_clustering(adata, 'kmeans')
-                calculate_cluster_info(adata, "kmeans_ref")
+                cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
+                if set(['cell_group', 'cell_type', 'cell_subtype', 'rank_filter', 'min_confidence']).issubset(set(cell_types.columns.tolist())) :
+                    refine_clustering(adata, 'kmeans')
+                    calculate_cluster_info(adata, "kmeans_ref")
+                else:
+                    print(">>> cell_types.csv is malformed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             except Exception as e:
                 print(e)
                 print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)

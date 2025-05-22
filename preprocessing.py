@@ -209,7 +209,6 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
 def generate_tile_gradient_data(np_img, bins, tile_size):
     num_rows = int(len(np_img) / tile_size)
     num_columns = int(len(np_img[0]) / tile_size)
-
     kernel_size = int(tile_size / light_gradient)
     gradient_data = []
     for row in range(num_rows):
@@ -226,8 +225,8 @@ def generate_tile_gradient_data(np_img, bins, tile_size):
                 for column_kernel in range(light_gradient):
                     tile_kernel_sy = row * tile_size + row_kernel * kernel_size
                     tile_kernel_sx = column * tile_size + column_kernel * kernel_size
-                    tile_kernel_ey = kernel_size + (tile_size % light_gradient) if row_kernel == light_gradient - 1 else 0
-                    tile_kernel_ex = kernel_size + (tile_size % light_gradient) if column_kernel == light_gradient - 1 else 0
+                    tile_kernel_ey = kernel_size + ((tile_size % light_gradient) if row_kernel == light_gradient - 1 else 0)
+                    tile_kernel_ex = kernel_size + ((tile_size % light_gradient) if column_kernel == light_gradient - 1 else 0)
                     tile_kernel = np_img[tile_kernel_sy:(tile_kernel_sy + tile_kernel_ey), tile_kernel_sx:(tile_kernel_sx + tile_kernel_ex)]
                     bin_count = np.histogram(np.ravel(tile_kernel), bins)[0]
                     samples = bin_count[bin_min] + bin_count[bin_max]
@@ -379,6 +378,7 @@ def preprocess_image(marker, marker_img):
 
         if balance_tiles == "yes":
             final_c_otsu = np.insert(final_c_otsu, 0, 0.0)
+            final_c_otsu = np.append(final_c_otsu, 1.0)
             if light_gradient > 1:
                 gradient_data = generate_tile_gradient_data(np_img, final_c_otsu, tile_size)
                 apply_tile_gradient_compensation(marker, np_img, final_c_otsu, gradient_data)
@@ -504,8 +504,8 @@ if __name__ =='__main__':
                         curr_image = np.array(PIL.Image.open(file_path))
                         if len(curr_image.shape) > 2:
                             curr_image = curr_image[:, :, 0]
-                            preprocess_image(marker, downscale_images(curr_image))
-                            upscale_results(marker)
+                        preprocess_image(marker, downscale_images(curr_image))
+                        upscale_results(marker)
                         break
             except Exception as e:
                 print('>>> Could not read image ' + file_path, flush=True)

@@ -5,6 +5,7 @@ import psutil
 import shutil
 import fnmatch
 import random
+import subprocess
 
 
 def batch_processor():
@@ -36,61 +37,66 @@ def batch_processor():
 
     swap_used = False
     batch_file = open(batch_filename, 'r')
-    while True:
-        try:
-            with open(pidfile_filename,'r') as f:
-                lines = f.readlines()
-                if psutil.pid_exists(int(lines[0])):
-                    print(">>> Another PIPEX process seems to be running, exiting =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-                    sys.exit()
-        except IOError:
-            pass
-        
-        curr_command = batch_file.readline()
-        if not curr_command:
-            #EOF
-            break
-        elif curr_command.startswith('#'):
-            #comment
-            continue
-        elif curr_command.startswith('run_id'):
-            #using the run_id provided by the user
-            run_id = curr_command.replace('run_id', '').strip()
-            print(">>> Setting run_id =",run_id, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-        elif curr_command.startswith('max_res'):
-            #setting PIPEX_MAX_RESOLUTION environment variable
-            os.environ["PIPEX_MAX_RESOLUTION"] = curr_command.replace('max_res', '').strip()
-            print(">>> Setting max resolution to =",os.environ["PIPEX_MAX_RESOLUTION"], datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-        elif curr_command.startswith('swap'):
-            #creating required swap via bash script 'enable_swap.sh'
-            print(">>> Creating swap space =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-            swap_req = curr_command.replace('swap', '').strip()
-            os.system('./enable_swap.sh ' + swap_req)
-            swap_used = True
-        elif len(curr_command.strip()) > 5:
-            #pipex command
+
+    try:
+        while True:
             try:
-                print(">>> Processing next job =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-                print('>>>    ' + curr_command.strip())
-                os.system(python_command + curr_command.strip())
-            except Exception:
+                with open(pidfile_filename,'r') as f:
+                    lines = f.readlines()
+                    if psutil.pid_exists(int(lines[0])):
+                        print(">>> Another PIPEX process seems to be running, exiting =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                        sys.exit()
+            except IOError:
                 pass
 
-            if curr_command.index('-data=') > 0:
-                arg_start_index = curr_command.index('-data=') + 6
-                end_char = ' '
-                if curr_command[arg_start_index:arg_start_index + 1] == '\'':
-                    end_char = '\''
-                    arg_start_index = arg_start_index + 1
-                elif curr_command[arg_start_index:arg_start_index + 1] == '\"':
-                    end_char = '\"'
-                    arg_start_index = arg_start_index + 1
-                arg_end_index = curr_command.index(end_char, arg_start_index + 1)
-                curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
-                if os.path.exists(log_filename):
-                    shutil.copyfile(log_filename, os.path.join(curr_data_folder, os.path.basename(log_filename)))
- 
-    batch_file.close()
+            curr_command = batch_file.readline()
+            if not curr_command:
+                #EOF
+                break
+            elif curr_command.startswith('#'):
+                #comment
+                continue
+            elif curr_command.startswith('run_id'):
+                #using the run_id provided by the user
+                run_id = curr_command.replace('run_id', '').strip()
+                print(">>> Setting run_id =",run_id, datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+            elif curr_command.startswith('max_res'):
+                #setting PIPEX_MAX_RESOLUTION environment variable
+                os.environ["PIPEX_MAX_RESOLUTION"] = curr_command.replace('max_res', '').strip()
+                print(">>> Setting max resolution to =",os.environ["PIPEX_MAX_RESOLUTION"], datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+            elif curr_command.startswith('swap'):
+                #creating required swap via bash script 'enable_swap.sh'
+                print(">>> Creating swap space =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                swap_req = curr_command.replace('swap', '').strip()
+                os.system('./enable_swap.sh ' + swap_req)
+                swap_used = True
+            elif len(curr_command.strip()) > 5:
+                #pipex command
+                try:
+                    print(">>> Processing next job =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                    print('>>>    ' + curr_command.strip())
+                    os.system(python_command + curr_command.strip())
+                except Exception:
+                    pass
+
+                if curr_command.index('-data=') > 0:
+                    arg_start_index = curr_command.index('-data=') + 6
+                    end_char = ' '
+                    if curr_command[arg_start_index:arg_start_index + 1] == '\'':
+                        end_char = '\''
+                        arg_start_index = arg_start_index + 1
+                    elif curr_command[arg_start_index:arg_start_index + 1] == '\"':
+                        end_char = '\"'
+                        arg_start_index = arg_start_index + 1
+                    arg_end_index = curr_command.index(end_char, arg_start_index + 1)
+                    curr_data_folder = curr_command[arg_start_index:arg_end_index].strip()
+                    if os.path.exists(log_filename):
+                        shutil.copyfile(log_filename, os.path.join(curr_data_folder, os.path.basename(log_filename)))
+
+        batch_file.close()
+
+    except Exception as e:
+        print(e)
 
     if "PIPEX_WORK" in os.environ:
         os.system('chmod -R 777 /opt/pipex/work')
