@@ -569,7 +569,7 @@ def clustering(df_norm, markers):
 
     if neigh_cluster_id != "":
         if neigh_cluster_id not in adata.obs:
-            adata.obs[neigh_cluster_id] = df_norm[neigh_cluster_id]
+            adata.obs[neigh_cluster_id] = df_norm[neigh_cluster_id].astype('category')
         sq.gr.centrality_scores(adata, neigh_cluster_id)
         sq.pl.centrality_scores(adata, neigh_cluster_id, save=(neigh_cluster_id + "_centrality_scores.jpg"))
         sq.gr.ripley(adata, cluster_key=neigh_cluster_id, mode="L")
