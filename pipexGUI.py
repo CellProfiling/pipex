@@ -63,8 +63,8 @@ tooltip_36 = '<optional, yes or no to apply log1p normalization to the markers>:
 tooltip_37 = '<optional, yes or no to apply quantile normalization to the markers>: \nexample -> yes'
 tooltip_38 = '<optional, name of the column in cell_data.csv to perform batch correction by>: \nexample -> batch_id'
 tooltip_39 = '<optional, yes or no to apply 0 to 1 re-scale normalization>: \nexample -> yes'
-tooltip_40 = '<optional, suffix for the markers to use as input columns for the analysis>: \nexample -> _local_90'
-tooltip_41 = '<optional, list of present specific markers to inlcude>: \nexample -> AMY2A,SST,GORASP2'
+tooltip_40 = '<optional, list of comma-separated suffixes for the markers to use as input columns for the analysis>: \nexample -> _local_90'
+tooltip_41 = '<optional, list of present specific markers to include>: \nexample -> AMY2A,SST,GORASP2'
 tooltip_42 = '<optional, name of the column to add as cluster color information from cell_data.csv>: \nexample -> kmeans_color'
 tooltip_43 = '<optional, "strictness" of stardist detections proximity, gradation between 0.001 and 0.999>: \nexample -> 0.5'
 tooltip_44 = '<optional, maximum allowed pixel area for initial Stardist detections>: \nexample -> 1600'
@@ -80,6 +80,7 @@ tooltip_53 = '<optional, number of datapoints used for smoothing the shapes>: \n
 tooltip_54 = '<optional, "none"/"hilbert"/"greedy" optimization of cutting path between shapes> : example -> none'
 tooltip_55 = '<optional, nearest neighbour heuristic distance for merging shapes>: \nexample -> 300'
 tooltip_56 = '<optional, list of present specific markers to preprocess>: \nexample -> DAPI,CTNNB1,AMY2A,SST'
+tooltip_57 = '<optional, yes or no to apply z normalization to the markers>: \nexample -> yes'
 
 
 
@@ -124,7 +125,8 @@ column = [[sg.Text('PIPEX data folder:', font='any 12'), sg.In(default_text=data
           [sg.Text('  - Cell size top crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-ANALYSIS_TOPTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_28)],
           [sg.Text('  - Cell size bottom crop:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0',s=20,disabled=True, key='-ANALYSIS_BOTTHR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_34)],
           [sg.Text('  - log1p normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=False,disabled=True, key='-ANALYSIS_LOGNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_37)],
-          [sg.Text('  - Standard normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_STDNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_39)],
+          [sg.Text('  - z normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=False,disabled=True, key='-ANALYSIS_ZNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_57)],
+          [sg.Text('  - min-max normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_MMNOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_39)],
           [sg.Text('  - Batch correction by column:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_BATCOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_38)],
           [sg.Text('  - Quantile normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-ANALYSIS_QUANOR-'), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_36)],
           [sg.Text('  - Perform leiden cluster', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_LEIDEN-', disabled=True), sg.Image(data=info_icon,subsample=3,tooltip=tooltip_29)],
@@ -237,7 +239,8 @@ while True:
         window['-ANALYSIS_TOPTHR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_BOTTHR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_LOGNOR-'].update(disabled=(not values['-ANALYSIS-']))
-        window['-ANALYSIS_STDNOR-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_ZNOR-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_MMNOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_QUANOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_BATCOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_LEIDEN-'].update(disabled=(not values['-ANALYSIS-']))
@@ -372,7 +375,8 @@ if values['-ANALYSIS-']:
         ' -cellsize_max=' + values['-ANALYSIS_TOPTHR-'] +
         ' -cellsize_min=' + values['-ANALYSIS_BOTTHR-'] +
         ' -log_norm=' + ('yes' if values['-ANALYSIS_LOGNOR-'] else 'no') +
-        ' -std_norm=' + ('yes' if values['-ANALYSIS_STDNOR-'] else 'no') +
+        ' -z_norm=' + ('yes' if values['-ANALYSIS_ZNOR-'] else 'no') +
+        ' -minmax_norm=' + ('yes' if values['-ANALYSIS_MMNOR-'] else 'no') +
         ' -quantile_norm=' + ('yes' if values['-ANALYSIS_QUANOR-'] else 'no') +
         ' -batch_corr=' + values['-ANALYSIS_BATCOR-'])
     if (values['-ANALYSIS_USEBIN-'] != ''):

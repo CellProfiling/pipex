@@ -337,6 +337,20 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
     imsave(os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg"), np.uint8(mark_boundaries(nuclei_img_orig, sd_labels_expanded) * 255))
     print(">>> Final joined segmentation result image over nuclei saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
+    bg_img = PIL.Image.new('RGB', (len(nuclei_img_orig[0]), len(nuclei_img_orig)), (0, 0, 0))
+    bg_img = PIL.Image.fromarray(np.uint8(mark_boundaries(np.array(bg_img), sd_labels_expanded, color=(0, 1, 0)) * 255))
+    bg_img = bg_img.convert("RGBA")
+    bg_data = bg_img.getdata()
+    new_data = []
+    for item in bg_data:
+        if item[0] == 0 and item[1] == 0 and item[2] == 0:
+            new_data.append((0, 0, 0, 0))
+        else:
+            new_data.append(item)
+    bg_img.putdata(new_data)
+    imsave(os.path.join(data_folder, "analysis", "segmentation_boundaries.png"), np.array(bg_img))
+    print(">>> Final segmentation boundaries overlay saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
     sdLabels_expanded_binary = np.copy(sd_labels_expanded)
     sdLabels_expanded_binary[sdLabels_expanded_binary > 0] = 1
     imsave(os.path.join(data_folder, "analysis", "segmentation_binary_mask.tif"), np.uint8(sdLabels_expanded_binary * 255))
@@ -369,8 +383,9 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
         cell_image = cell.image_intensity
         cell_image = cell_image[(cell_image != 0) & (~np.isnan(cell_image))]
         data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image, 0.9) if len(cell_image) > 0 else 0
-        data_table[cell.label][marker + '_ratio_pixels'] = np.count_nonzero(cell_image >= cell_binarized_threshold) / cell.area
-        data_table[cell.label][marker + '_otsu3'] = 1.0 + ((cell.intensity_mean - marker_img_min) / (marker_img_max - marker_img_min)) - cell_binarized_threshold
+        cell_image_norm = ((cell_image - marker_img_min) / (marker_img_max - marker_img_min))
+        data_table[cell.label][marker + '_ratio_pixels'] = np.count_nonzero(cell_image_norm >= cell_binarized_threshold) / cell.area
+        data_table[cell.label][marker + '_otsu3'] = ((cell.intensity_mean - marker_img_min) / (marker_img_max - marker_img_min)) - cell_binarized_threshold
 
     print(">>> Marker " + marker + " calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 

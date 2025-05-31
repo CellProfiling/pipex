@@ -5,9 +5,10 @@ import datetime
 import pandas as pd
 import numpy as np
 from skimage.io import imsave
-from skimage.segmentation import relabel_sequential
+from skimage.segmentation import relabel_sequential, mark_boundaries
 from lmd.lib import SegmentationLoader
 import cv2
+import PIL
 
 
 data_folder = os.environ.get('PIPEX_DATA')
@@ -129,6 +130,22 @@ if __name__ =='__main__':
         print(">>> Filtered segmentation result binary image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
         del labels_binary
 
+        bg_img = PIL.Image.new('RGB', (len(labels[0]), len(labels)), (0, 0, 0))
+        bg_img = PIL.Image.fromarray(np.uint8(mark_boundaries(np.array(bg_img), labels, color=(0, 1, 0)) * 255))
+        bg_img = bg_img.convert("RGBA")
+        bg_data = bg_img.getdata()
+        new_data = []
+        for item in bg_data:
+            if item[0] == 0 and item[1] == 0 and item[2] == 0:
+                new_data.append((0, 0, 0, 0))
+            else:
+                new_data.append(item)
+        bg_img.putdata(new_data)
+        imsave(os.path.join(data_folder, "analysis", "segmentation_filtered_boundaries.png"),
+               np.array(bg_img))
+        print(">>> Final segmentation boundaries overlay saved =",
+              datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+
         if np.amax(labels) <= 255:
             imsave(os.path.join(data_folder, "analysis", "segmentation_filtered_mask.tif"), np.uint8(labels * 255))
         elif np.amax(labels) <= 65535:
@@ -241,6 +258,21 @@ if __name__ =='__main__':
                 imsave(os.path.join(data_folder, "analysis", "segmentation_filtered_tile_" + tile_desc + "_binary_mask.tif"), np.uint8(tileBinary * 255))
                 print(">>> Filtered segmentation tile ",tile_desc," result binary image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
                 del tileBinary
+
+                bg_img = PIL.Image.new('RGB', (len(tile[0]), len(tile)), (0, 0, 0))
+                bg_img = PIL.Image.fromarray(np.uint8(mark_boundaries(np.array(bg_img), tile, color=(0, 1, 0)) * 255))
+                bg_img = bg_img.convert("RGBA")
+                bg_data = bg_img.getdata()
+                new_data = []
+                for item in bg_data:
+                    if item[0] == 0 and item[1] == 0 and item[2] == 0:
+                        new_data.append((0, 0, 0, 0))
+                    else:
+                        new_data.append(item)
+                bg_img.putdata(new_data)
+                imsave(os.path.join(data_folder, "analysis", "segmentation_filtered_tile_" + tile_desc + "_boundaries.png"), np.array(bg_img))
+                print(">>> Final segmentation ",tile_desc," boundaries overlay saved =",
+                      datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
                 if np.amax(tile) <= 255:
                     imsave(os.path.join(data_folder, "analysis", "segmentation_filtered_tile_" + tile_desc + "_mask.tif"), np.uint8(tile * 255))

@@ -21,14 +21,15 @@ import json
 data_folder = os.environ.get('PIPEX_DATA')
 image_size = 1000
 analysis_markers = []
+use_bin = []
 cellsize_max = 0
 cellsize_min = 0
 custom_filter = "no"
-std_norm = "no"
+minmax_norm = "no"
+z_norm = "no"
 log_norm = "no"
 quantile_norm = "no"
 batch_corr = ""
-use_bin = ""
 leiden = "no"
 kmeans = "no"
 elbow = "no"
@@ -45,6 +46,13 @@ def data_calculations():
     df_norm = pd.read_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'))
 
     markers = analysis_markers
+
+    if len(use_bin) > 0:
+        expanded_markers = []
+        for i in range(len(markers)):
+            for j in range(len(use_bin)):
+               expanded_markers.append(markers[i] + use_bin[j])
+        markers = expanded_markers
 
     print(">>> List of markers to analyze ",markers," =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
@@ -78,12 +86,14 @@ def data_calculations():
     for marker in markers:
         if log_norm == 'yes':
             df_norm[marker] = np.log1p(df_norm[marker])
-        if std_norm == 'yes':
+        if z_norm == 'yes':
+            df_norm[marker] = (df_norm[marker] - df_norm[marker].mean()) / (df_norm[marker].std() + 0.00000001)
+        if minmax_norm == 'yes':
             marker_min = df_norm[marker].min()
             marker_max = df_norm[marker].max()
             df_norm[marker] = df_norm[marker].apply(lambda x: (x - marker_min) / (marker_max - marker_min))
 
-    if log_norm == 'yes' or std_norm == 'yes':
+    if log_norm == 'yes' or z_norm == 'yes' or minmax_norm == 'yes':
         print(">>> Markers normalized =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     #ComBat batch correction
@@ -208,7 +218,7 @@ def fill_surface_html_template(markers, df_norm):
     ticktext_formatted = ticktext_formatted[:-1] + "]"
     html_content = html_content.replace("$$$TICKS$$$", ticktext_formatted)
     df_surface = df_norm
-    if std_norm != 'yes':
+    if minmax_norm != 'yes':
         df_surface = df_norm.copy()
         for marker in markers:
             marker_min = df_surface[marker].min()
@@ -432,11 +442,7 @@ def refine_clustering(adata, cluster_type):
 
 #Function to perform different cluster methods
 def clustering(df_norm, markers):
-    #We create an anndata object with the data so we can proceed with the clustering analysis using scanpy and squidpy libraries
-    if use_bin != "":
-        adata = sc.AnnData(df_norm.loc[:, [marker + use_bin for marker in markers]])
-    else:
-        adata = sc.AnnData(df_norm.loc[:, markers])
+    adata = sc.AnnData(df_norm.loc[:, markers])
     adata.obs_names = 'cell_id_' + df_norm['cell_id'].astype(str)
     adata.var_names = markers
 
@@ -562,6 +568,8 @@ def clustering(df_norm, markers):
                 print(">>> Failed at refining kmeans cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if neigh_cluster_id != "":
+        if neigh_cluster_id not in adata.obs:
+            adata.obs[neigh_cluster_id] = df_norm[neigh_cluster_id]
         sq.gr.centrality_scores(adata, neigh_cluster_id)
         sq.pl.centrality_scores(adata, neigh_cluster_id, save=(neigh_cluster_id + "_centrality_scores.jpg"))
         sq.gr.ripley(adata, cluster_key=neigh_cluster_id, mode="L")
@@ -614,10 +622,7 @@ def clustering(df_norm, markers):
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
             df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
 
-            if use_bin != "":
-                df_corr = pd.concat([df[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')],axis=1).corr()
-            else:
-                df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
+            df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
 
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
@@ -633,12 +638,12 @@ def clustering(df_norm, markers):
 #Function to handle the command line parameters passed
 def options(argv):
     if len(argv) == 0:
-       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, suffix for the markers to use as input columns for the analysis>: example -> -use_bin=_local_90\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, name of the cluster column to use to perform the neigborhood analysis upon>: example -> -neigh_cluster_id=kmeans', flush=True)
+       print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-z_norm=<yes or no to apply z normalization> : example -> -z_norm=yes\n\t-minmax_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -minmax_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, list of comma separated suffixes for the markers to use as input columns for the analysis>: example -> -use_bin=_local_90\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, name of the cluster column to use to perform the neigborhood analysis upon>: example -> -neigh_cluster_id=kmeans', flush=True)
        sys.exit()
     else:
         for arg in argv:
             if arg.startswith('-help'):
-                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-std_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -std_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, suffix for the markers to use as input columns for the analysis>: example -> -use_bin=_local_90\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, name of the cluster column to use to perform the neigborhood analysis upon>: example -> -neigh_cluster_id=kmeans', flush=True)
+                print('analysis.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-image_size=<optional, one-side approximate resolution> : example -> -image_size=1000\n\t-analysis_markers=<optional, list of present specific markers to analyze> : example -> -analysis_markers=AMY2A,SST,GORASP2\n\t-cellsize_max=<optional, percentage of biggest cells to remove> : example -> -cellsize_max=5\n\t-cellsize_min=<optional, percentage of smallest cells to remove> : example -> -cellsize_min=5\n\t-custom_filter=<yes or no to apply custom Cell Profiling lab\'s biomarkers filtering> : example -> -custom_filter=yes\n\t-log_norm=<yes or no to apply log n + 1 normalization> : example -> -log_norm=yes\n\t-z_norm=<yes or no to apply z normalization> : example -> -z_norm=yes\n\t-minmax_norm=<yes or no to apply 0 to 1 re-scale normalization> : example -> -minmax_norm=yes\n\t-quantile_norm=<yes or no to apply quantile normalization> : example -> -quantile_norm=yes\n\t-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by> : example -> batch_id\n\t-use_bin=<optional, list of comma separated suffixes for the markers to use as input columns for the analysis>: example -> -use_bin=_local_90\n\t-leiden=<optional, yes or no to perform leiden clustering> : example -> -leiden=yes\n\t-kmeans=<optional, yes or no to perform kmeans clustering> : example -> -kmeans=yes\n\t-elbow=<optional, yes or no to show elbow analysis for kmeans> : example -> -elbow=yes\n\t-k_clusters=<optional, force k number of cluster in kmeans> : example -> -k_clusters=10\n\t-refine_clusters=<optional, yes or no to refine cluster results> : example -> -refine_clusters=yes\n\t-neigh_cluster_id=<optional, name of the cluster column to use to perform the neigborhood analysis upon>: example -> -neigh_cluster_id=kmeans', flush=True)
                 sys.exit()
             elif arg.startswith('-data='):
                 global data_folder
@@ -661,9 +666,12 @@ def options(argv):
             elif arg.startswith('-log_norm='):
                 global log_norm
                 log_norm = arg[10:]
-            elif arg.startswith('-std_norm='):
-                global std_norm
-                std_norm = arg[10:]
+            elif arg.startswith('-minmax_norm='):
+                global minmax_norm
+                minmax_norm = arg[13:]
+            elif arg.startswith('-z_norm='):
+                global z_norm
+                z_norm = arg[8:]
             elif arg.startswith('-quantile_norm='):
                 global quantile_norm
                 quantile_norm = arg[15:]
@@ -672,7 +680,7 @@ def options(argv):
                 batch_corr = arg[12:]
             elif arg.startswith('-use_bin='):
                 global use_bin
-                use_bin = arg[9:]
+                use_bin = [x.strip() for x in arg[9:].split(",")]
             elif arg.startswith('-leiden='):
                 global leiden
                 leiden = arg[8:]
