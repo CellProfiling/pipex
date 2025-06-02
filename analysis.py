@@ -593,7 +593,7 @@ def clustering(df_norm, markers):
             df_norm['leiden'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden']).astype(str)
             df_norm['leiden_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden_color']).astype(str)
 
-            if use_bin != "":
+            if len(use_bin) > 0:
                 df_corr = pd.concat([df[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['leiden'], prefix='clusterL')],axis=1).corr()
             else:
                 df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['leiden'], prefix='clusterL')], axis=1).corr()
