@@ -47,6 +47,7 @@ def data_calculations():
 
     markers = analysis_markers
 
+    print("use_bin", use_bin)
     if len(use_bin) > 0:
         expanded_markers = []
         for i in range(len(markers)):
@@ -682,8 +683,9 @@ def options(argv):
                 global batch_corr
                 batch_corr = arg[12:]
             elif arg.startswith('-use_bin='):
-                global use_bin
-                use_bin = [x.strip() for x in arg[9:].split(",")]
+                if arg != '-use_bin=':
+                    global use_bin
+                    use_bin = [x.strip() for x in arg[9:].split(",")]
             elif arg.startswith('-leiden='):
                 global leiden
                 leiden = arg[8:]
