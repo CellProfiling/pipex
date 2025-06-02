@@ -622,7 +622,10 @@ def clustering(df_norm, markers):
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
             df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
 
-            df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
+            if len(use_bin) > 0:
+                df_corr = pd.concat([df[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
+            else:
+                df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
 
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
