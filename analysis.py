@@ -47,7 +47,6 @@ def data_calculations():
 
     markers = analysis_markers
 
-    print("use_bin", use_bin)
     if len(use_bin) > 0:
         expanded_markers = []
         for i in range(len(markers)):
@@ -594,10 +593,7 @@ def clustering(df_norm, markers):
             df_norm['leiden'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden']).astype(str)
             df_norm['leiden_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden_color']).astype(str)
 
-            if len(use_bin) > 0:
-                df_corr = pd.concat([df_norm[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['leiden'], prefix='clusterL')],axis=1).corr()
-            else:
-                df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['leiden'], prefix='clusterL')], axis=1).corr()
+            df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['leiden'], prefix='clusterL')], axis=1).corr()
 
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
@@ -623,10 +619,7 @@ def clustering(df_norm, markers):
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
             df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
 
-            if len(use_bin) > 0:
-                df_corr = pd.concat([df_norm[[marker + use_bin for marker in markers]], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
-            else:
-                df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
+            df_corr = pd.concat([df_norm[markers], pd.get_dummies(df_norm['kmeans'], prefix='clusterK')], axis=1).corr()
 
             plt.figure()
             fig1, ax1 = plt.subplots(figsize=(image_size / 100,image_size / 140))
