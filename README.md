@@ -439,14 +439,15 @@ Please make sure you the name of your marker column is a strict match with the a
 Annex 4: Cluster refinement procedure
 -------------------------------------
 
-PIPEX's analysis step includes the possibility to refine the unsupervised clustering results (leiden and/or kmeans). This can help you with the manual annotation and merging of the clusters automatically discovered.
+PIPEX's analysis step includes the possibility to perform multiple refinements of the unsupervised clustering results (leiden and/or kmeans). This can help you with the manual annotation and merging of the clusters automatically discovered.
 
 The idea behind the cluster refinement algorithm is to explore the ranked genes associated to each cluster and try to match them with rules stated by the user. The algorithm then assigns a confidence score per cluster and rule, depending how close its ranked genes are to the rule/s definition/s. Finally, the refinement picks per cluster the annotated cluster with higher confidence (ties are solved by row order).
 
 To use the cluster refinement, you have to create a `cell_types.csv` file with rows containing the following information:
-- `cell_group`: used as a prefix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
-- `cell_type`: used as a interfix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
-- `cell_subtype`: used as a suffix for the manually annotated cluster name. The final cluster name will be `[cell_group]-[cell_type]-[cell_subtype]`
+- `ref_id`: used as a suffix for the manually annotated cluster name. The final cluster name will be `leiden_ref[ref_id]` or `kmeans_ref[ref_id]`. Each one of the unique `ref_id` groups is a separate cluster refinement.
+- `cell_group`: used as a prefix for the manually annotated cluster name. Used in the cluster refinement JSON report file`
+- `cell_type`: used as a interfix for the manually annotated cluster name. Used in the cluster refinement JSON report file`
+- `cell_subtype`: used as a suffix for the manually annotated cluster name. Used in the cluster refinement JSON report file`
 - `rank_filter`: used to direct the refinement procedure to use only certain ranked genes. Default is `all` (no filtering, but all rule markers must be present in the cluster class ranked genes), you can use `positive_only` (all rule markers must be present in the cluster class ranked genes and will enforce the usage of only the ones with positive values) or `none` (no filtering, rule markers may not present in the cluster class ranked genes)
 - `min_confidence`: by default, the refinement procedure aggresively merges all clusters that minimally fullfil the indicated rules. You can force the process to be more strict by using a higher `min_confidence` probability (values from 0 to 100)
 - `marker[n]` and `rule[n]` pairs: you can add an arbritary amount (at least one!) of marker rules to guide the algorithm how to annotate/merge the automatically discovered clusters. The marker value must match one of your analysis markers and the rule states how the marker should be relatively placed amongst the ranked genes (values `high`,`medium`,`low`)
@@ -454,12 +455,14 @@ To use the cluster refinement, you have to create a `cell_types.csv` file with r
 Here's and example of how a `cell_types.csv` file usually looks:
 <code>
 
-    cell_group,cell_type,cell_subtype,rank_filter,min_confidence,marker1,rule1,marker2,rule2,marker3,rule3
-    artifact,fold,unknown,all,10,CBS,high,CHGA,high,AMY2B,high
-    endocrine,islet,all,positive_only,10,CHGA,high,CPEP,high,AMY2B,low
-    exocrine,acinar,unknown1,all,10,CBS,high,AMY2B,high
-    endothelial,vessels,all,positive_only,30,CD31,high,aSMA,high
-    epithelial,ductal,unknown,all,10,KRT19,high,PANCK,high
-    immune,potential,artifact,all,10,HLADR,high,NPDC1,high,aSMA,low
+    ref_id,cell_group,cell_type,cell_subtype,rank_filter,min_confidence,marker1,rule1,marker2,rule2,marker3,rule3
+    1,artifact,fold,unknown,all,10,CBS,high,CHGA,high,AMY2B,high
+    1,endocrine,islet,all,positive_only,10,CHGA,high,CPEP,high,AMY2B,low
+    1,exocrine,acinar,unknown1,all,10,CBS,high,AMY2B,high
+    1,endothelial,vessels,all,positive_only,30,CD31,high,aSMA,high
+    1,epithelial,ductal,unknown,all,10,KRT19,high,PANCK,high
+    1,immune,potential,artifact,all,10,HLADR,high,NPDC1,high,aSMA,low
+    2,immune,potential,artifact,all,0,HLADR,medium,NPDC1,medium
+    2,epithelial,ductal,unknown,all,0,KRT19,medium,PANCK,medium
 
 </code>

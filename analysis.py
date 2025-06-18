@@ -16,6 +16,7 @@ from scipy.spatial.distance import cdist
 import qnorm
 from combat.pycombat import pycombat
 import json
+import random
 
 
 data_folder = os.environ.get('PIPEX_DATA')
@@ -253,10 +254,20 @@ def fill_surface_html_template(markers, df_norm):
     f.close()
 
 
+#Function to generate a random RGB packed integer
+def random_rgb_color(seed):
+    random.seed(seed)
+    r = random.randint(0, 255)
+    g = random.randint(0, 255)
+    b = random.randint(0, 255)
+
+    return (r << 16) + (g << 8) + b
+
+
 #Function to convert regular RGB to packed integer
-def generate_leiden_color(leiden_id, leiden_color_list):
+def generate_cluster_color(cluster_id, cluster_color_list):
     try:
-        rgb = PIL.ImageColor.getcolor(leiden_color_list[int(leiden_id)], "RGB")
+        rgb = PIL.ImageColor.getcolor(cluster_color_list[int(cluster_id)], "RGB")
         return (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]
     except Exception as e:
         return ''
@@ -363,12 +374,13 @@ def calculate_cluster_info(adata, cluster_type):
     plt.close()
 
 
-def refine_clustering(adata, cluster_type):
+def refine_clustering(adata, cluster_type, curr_ref_id):
     clustering_merge_data = {}
     clustering_merge_data['scores'] = {}
     clustering_merge_data['cell_types'] = {}
     cluster_dif_list_all = []
     cluster_dif_list_positive = []
+    sc.tl.rank_genes_groups(adata, cluster_type, method='t-test')
     for cluster_id in adata.obs[cluster_type].unique():
         cluster_score_list = []
         cluster_merge_clusters_scores = {}
@@ -403,6 +415,8 @@ def refine_clustering(adata, cluster_type):
         clustering_merge_data['cell_types'][cluster_id] = []
 
     cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
+    cell_types['ref_id'] = cell_types['ref_id'].astype(str)
+    cell_types = cell_types[cell_types["ref_id"] == curr_ref_id]
     for index, row in cell_types.iterrows():
         for cluster_id in clustering_merge_data['scores']:
             if row['rank_filter'] != "positive_only" or "positive_only" in clustering_merge_data['scores'][cluster_id]['rank_filter']:
@@ -416,8 +430,8 @@ def refine_clustering(adata, cluster_type):
                     clustering_merge_data['cell_types'][cluster_id].append(curr_final_merging_data)
 
     clustering_merge_data['candidates'] = {}
-    adata.obs[cluster_type + "_ref"] = adata.obs[cluster_type].astype(str)
-    adata.obs[cluster_type + "_ref_p"] = adata.obs[cluster_type].astype(str)
+    adata.obs[cluster_type + "_ref" + curr_ref_id] = adata.obs[cluster_type].astype(str)
+    adata.obs[cluster_type + "_ref" + curr_ref_id + "_p"] = adata.obs[cluster_type].astype(str)
     ordered_cluster_keys = list(clustering_merge_data['cell_types'])
     ordered_cluster_keys.sort()
     for cluster_id in ordered_cluster_keys:
@@ -430,13 +444,13 @@ def refine_clustering(adata, cluster_type):
 
         if best_real_confidence > 0:
             clustering_merge_data['candidates'][cluster_id] = best_candidate
-            adata.obs.loc[adata.obs[cluster_type + "_ref"] == cluster_id, cluster_type + "_ref"] = best_candidate['cell_type']
-            adata.obs.loc[adata.obs[cluster_type + "_ref_p"] == cluster_id, cluster_type + "_ref_p"] = '{:.1%}'.format(best_candidate['prob']) #best_candidate['real_confidence'][:-1]
+            adata.obs.loc[adata.obs[cluster_type + "_ref" + curr_ref_id] == cluster_id, cluster_type + "_ref" + curr_ref_id] = best_candidate['cell_type']
+            adata.obs.loc[adata.obs[cluster_type + "_ref" + curr_ref_id + "_p"] == cluster_id, cluster_type + "_ref" + curr_ref_id + "_p"] = '{:.1%}'.format(best_candidate['prob']) #best_candidate['real_confidence'][:-1]
 
     clustering_merge_data["scores"] = OrderedDict(sorted(clustering_merge_data["scores"].items()))
     clustering_merge_data["cell_types"] = OrderedDict(sorted(clustering_merge_data["cell_types"].items()))
     clustering_merge_data["candidates"] = OrderedDict(sorted(clustering_merge_data["candidates"].items()))
-    with open(os.path.join(data_folder, 'analysis', 'downstream', 'cell_types_result_' + cluster_type + '.json'), 'w') as outfile:
+    with open(os.path.join(data_folder, 'analysis', 'downstream', 'cell_types_result_' + cluster_type + curr_ref_id + '.json'), 'w') as outfile:
         json.dump(clustering_merge_data, outfile, indent = 4)
 
 
@@ -490,16 +504,18 @@ def clustering(df_norm, markers):
         calculate_cluster_info(adata, "leiden")
 
         if refine_clusters == "yes":
-            try:
-                cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
-                if set(['cell_group', 'cell_type', 'cell_subtype', 'rank_filter', 'min_confidence']).issubset(set(cell_types.columns.tolist())) :
-                    refine_clustering(adata, 'leiden')
-                    calculate_cluster_info(adata, "leiden_ref")
-                else:
-                    print(">>> cell_types.csv is malformed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-            except Exception as e:
-                print(e)
-                print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+            #try:
+            cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
+            if set(['ref_id', 'cell_group', 'cell_type', 'cell_subtype', 'rank_filter', 'min_confidence']).issubset(set(cell_types.columns.tolist())):
+                cell_types['ref_id'] = cell_types['ref_id'].astype(str)
+                for curr_ref_id in cell_types["ref_id"].unique():
+                    refine_clustering(adata, 'leiden', curr_ref_id)
+                    calculate_cluster_info(adata, "leiden_ref" + curr_ref_id)
+            else:
+                print(">>> cell_types.csv is malformed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+            #except Exception as e:
+            #    print(e)
+            #    print(">>> Failed at refining leiden cluster =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
     if kmeans == 'yes':
         if elbow == 'yes':
@@ -558,9 +574,11 @@ def clustering(df_norm, markers):
         if refine_clusters == "yes":
             try:
                 cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
-                if set(['cell_group', 'cell_type', 'cell_subtype', 'rank_filter', 'min_confidence']).issubset(set(cell_types.columns.tolist())) :
-                    refine_clustering(adata, 'kmeans')
-                    calculate_cluster_info(adata, "kmeans_ref")
+                if set(['ref_id', 'cell_group', 'cell_group', 'cell_type', 'cell_subtype', 'rank_filter', 'min_confidence']).issubset(set(cell_types.columns.tolist())) :
+                    cell_types['ref_id'] = cell_types['ref_id'].astype(str)
+                    for curr_ref_id in cell_types["ref_id"]:
+                        refine_clustering(adata, 'kmeans', curr_ref_id)
+                        calculate_cluster_info(adata, "kmeans_ref" + curr_ref_id)
                 else:
                     print(">>> cell_types.csv is malformed =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
             except Exception as e:
@@ -581,15 +599,27 @@ def clustering(df_norm, markers):
             df['leiden'] = df['cell_id'].map(adata.obs.set_index('id')['leiden']).astype(str)
             df['leiden'] = df['leiden'].fillna('')
             leiden_color_list = adata.uns['leiden_colors']
-            df['leiden_color'] = df.apply(lambda row: generate_leiden_color(row['leiden'], leiden_color_list), axis=1)
+            df['leiden_color'] = df.apply(lambda row: generate_cluster_color(row['leiden'], leiden_color_list), axis=1)
             if refine_clusters == "yes":
-                df['leiden_ref'] = df['leiden']
-                df['leiden_ref'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref']).astype(str)
-                df['leiden_ref_p'] = 0
-                df['leiden_ref_p'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref_p']).astype(str)
-                df['leiden_ref_color'] = df['leiden_color']
-                for kmeans_ref_id in adata.obs['leiden_ref'].unique():
-                    df.loc[df['leiden_ref'] == kmeans_ref_id, "leiden_ref_color"] = df.loc[df['leiden_ref'] == kmeans_ref_id, "leiden_ref_color"].values[0]
+                cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
+                cell_types['ref_id'] = cell_types['ref_id'].astype(str)
+                list_cell_types = cell_types["ref_id"].unique()
+                if len(list_cell_types) > 1:
+                    df['leiden_ref_merged'] = ''
+                    df['leiden_ref_merged_color'] = 0
+                for curr_ref_id in list_cell_types:
+                    df['leiden_ref' + curr_ref_id] = df['leiden']
+                    df['leiden_ref' + curr_ref_id] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref' + curr_ref_id]).astype(str)
+                    df['leiden_ref' + curr_ref_id + '_p'] = 0
+                    df['leiden_ref' + curr_ref_id + '_p'] = df['cell_id'].map(adata.obs.set_index('id')['leiden_ref' + curr_ref_id + '_p']).astype(str)
+                    df['leiden_ref' + curr_ref_id + '_color'] = df['leiden_color']
+                    for leiden_ref_id in adata.obs['leiden_ref' + curr_ref_id].unique():
+                        df.loc[df['leiden_ref' + curr_ref_id] == leiden_ref_id, "leiden_ref" + curr_ref_id + "_color"] = df.loc[df['leiden_ref' + curr_ref_id] == leiden_ref_id, "leiden_ref" + curr_ref_id + "_color"].values[0]
+                    if len(list_cell_types) > 1:
+                        df['leiden_ref_merged'] = df['leiden_ref_merged'] + '-' + df['leiden_ref' + curr_ref_id].astype(str)
+                if len(list_cell_types) > 1:
+                    list_cluster_ids = list(df['leiden_ref_merged'].unique())
+                    df['leiden_ref_merged_color'] = df.apply(lambda row: random_rgb_color(list_cluster_ids.index(row['leiden_ref_merged'])), axis=1)
             df_norm['leiden'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden']).astype(str)
             df_norm['leiden_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['leiden_color']).astype(str)
 
@@ -607,15 +637,27 @@ def clustering(df_norm, markers):
             df['kmeans'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans']).astype(str)
             df['kmeans'] = df['kmeans'].fillna('')
             kmeans_color_list = adata.uns['kmeans_colors']
-            df['kmeans_color'] = df.apply(lambda row: generate_leiden_color(row['kmeans'], kmeans_color_list), axis=1)
+            df['kmeans_color'] = df.apply(lambda row: generate_cluster_color(row['kmeans'], kmeans_color_list), axis=1)
             if refine_clusters == "yes":
-                df['kmeans_ref'] = df['kmeans']
-                df['kmeans_ref'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref']).astype(str)
-                df['kmeans_ref_p'] = 0
-                df['kmeans_ref_p'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref_p']).astype(str)
-                df['kmeans_ref_color'] = df['kmeans_color']
-                for kmeans_ref_id in adata.obs['kmeans_ref'].unique():
-                    df.loc[df['kmeans_ref'] == kmeans_ref_id, "kmeans_ref_color"] = df.loc[df['kmeans_ref'] == kmeans_ref_id, "kmeans_ref_color"].values[0]
+                cell_types = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
+                cell_types['ref_id'] = cell_types['ref_id'].astype(str)
+                list_cell_types = cell_types["ref_id"].unique()
+                if len(list_cell_types) > 1:
+                    df['kmeans_ref_merged'] = ''
+                    df['kmeans_ref_merged_color'] = 0
+                for curr_ref_id in list_cell_types:
+                    df['kmeans_ref' + curr_ref_id] = df['kmeans']
+                    df['kmeans_ref' + curr_ref_id] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref' + curr_ref_id]).astype(str)
+                    df['kmeans_ref' + curr_ref_id + '_p'] = 0
+                    df['kmeans_ref' + curr_ref_id + '_p'] = df['cell_id'].map(adata.obs.set_index('id')['kmeans_ref' + curr_ref_id + '_p']).astype(str)
+                    df['kmeans_ref' + curr_ref_id + '_color'] = df['kmeans_color']
+                    for kmeans_ref_id in adata.obs['kmeans_ref' + curr_ref_id].unique():
+                        df.loc[df['kmeans_ref' + curr_ref_id] == kmeans_ref_id, "kmeans_ref" + curr_ref_id + "_color"] = df.loc[df['kmeans_ref' + curr_ref_id] == kmeans_ref_id, "kmeans_ref" + curr_ref_id + "_color"].values[0]
+                    if len(list_cell_types) > 1:
+                        df['kmeans_ref_merged'] = df['kmeans_ref_merged'] + '-' + df['kmeans_ref' + curr_ref_id].astype(str)
+                if len(list_cell_types) > 1:
+                    list_cluster_ids = list(df['kmeans_ref_merged'].unique())
+                    df['kmeans_ref_merged_color'] = df.apply(lambda row: random_rgb_color(list_cluster_ids.index(row['kmeans_ref_merged'])), axis=1)
             df_norm['kmeans'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans']).astype(str)
             df_norm['kmeans_color'] = df_norm['cell_id'].map(df.set_index('cell_id')['kmeans_color']).astype(str)
 
