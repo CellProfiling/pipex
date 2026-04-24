@@ -15,7 +15,8 @@ from stardist.plot import render_label
 import cv2
 
 from skimage.io import imsave, imread
-from skimage.filters import threshold_multiotsu
+from skimage.filters import threshold_multiotsu, threshold_triangle
+from sklearn.mixture import GaussianMixture
 from skimage.measure import regionprops
 from skimage.segmentation import watershed, mark_boundaries, expand_labels, relabel_sequential
 from skimage.feature import peak_local_max
@@ -45,6 +46,7 @@ adjust_images = 0
 custom_segmentation = ""
 custom_segmentation_type = "full"
 measure_markers = ""
+gmm_min_separation = 0.5
 
 
 def downscale_images(np_img):
@@ -339,6 +341,30 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
     c_otsu = threshold_multiotsu(marker_img_norm, 3)
     cell_binarized_threshold = c_otsu[0]
     log("Marker " + marker + " binarize threshold " + str(cell_binarized_threshold))
+
+    try:
+        tri_threshold = float(threshold_triangle(marker_img_norm))
+    except Exception:
+        tri_threshold = None
+
+    gmm_model = None
+    gmm_pos_idx = 1
+    try:
+        vals = marker_img_norm.flatten()
+        vals = vals[np.isfinite(vals)]
+        if len(vals) >= 10 and np.std(vals) > 0:
+            gmm = GaussianMixture(n_components=2, random_state=42, max_iter=300)
+            gmm.fit(vals.reshape(-1, 1))
+            means = gmm.means_.flatten()
+            stds = np.sqrt(gmm.covariances_.flatten())
+            order = np.argsort(means)
+            sep = (means[order[1]] - means[order[0]]) / (stds[order[0]] + stds[order[1]])
+            if sep >= gmm_min_separation:
+                gmm_model = gmm
+                gmm_pos_idx = int(order[1])
+    except Exception:
+        pass
+
     marker_properties = regionprops(cellLabels, marker_img)
     #obtaining mean intensity per cell
     for cell in marker_properties:
@@ -348,7 +374,12 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
         data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image, 0.9) if len(cell_image) > 0 else 0
         cell_image_norm = np.maximum((cell_image - marker_img_min) / marker_img_range, 0.0)
         data_table[cell.label][marker + '_ratio_pixels'] = np.count_nonzero(cell_image_norm >= cell_binarized_threshold) / cell.area
-        data_table[cell.label][marker + '_otsu3'] = np.maximum((cell.intensity_mean - marker_img_min) / marker_img_range, 0.0) - cell_binarized_threshold
+        cell_mean_norm = np.maximum((cell.intensity_mean - marker_img_min) / marker_img_range, 0.0)
+        data_table[cell.label][marker + '_otsu3'] = cell_mean_norm - cell_binarized_threshold
+        data_table[cell.label][marker + '_triangle_score'] = (cell_mean_norm - tri_threshold) if tri_threshold is not None else np.nan
+        data_table[cell.label][marker + '_gmm_prob'] = (
+            float(gmm_model.predict_proba([[cell_mean_norm]])[0][gmm_pos_idx])
+            if gmm_model is not None else np.nan)
 
     log("Marker " + marker + " calculated")
 
@@ -385,6 +416,8 @@ def options(argv):
         help='type of the custom segmentation : example -> -custom_segmentation_type=full')
     parser.add_argument('--measure_markers', type=lambda s: [x.strip() for x in s.split(',')], default=[],
         help='list of marker names to measure : example -> -measure_markers=AMY2A,SST,GORASP2')
+    parser.add_argument('--gmm_min_separation', type=float, default=0.5,
+        help='minimum separation between GMM components (in combined std units) to trust the fit and compute gmm_prob : example -> -gmm_min_separation=0.5')
     if not argv:
         parser.print_help()
         sys.exit()
@@ -406,6 +439,7 @@ if __name__ =='__main__':
     custom_segmentation = args.custom_segmentation
     custom_segmentation_type = args.custom_segmentation_type
     measure_markers = sanitize_marker_list(args.measure_markers)
+    gmm_min_separation = args.gmm_min_separation
 
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
@@ -497,6 +531,8 @@ if __name__ =='__main__':
         binarized_marker_columns.append(marker + "_local_90")
         binarized_marker_columns.append(marker + "_ratio_pixels")
         binarized_marker_columns.append(marker + "_otsu3")
+        binarized_marker_columns.append(marker + "_triangle_score")
+        binarized_marker_columns.append(marker + "_gmm_prob")
     measure_markers.extend(binarized_marker_columns)
     measure_markers.insert(0, 'memref')
     measure_markers.insert(0, 'eccentricity')

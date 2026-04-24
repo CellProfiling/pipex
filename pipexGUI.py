@@ -96,6 +96,7 @@ tooltip_58 = '<number of pixels for top-hat background subtraction radius, 0 = d
 tooltip_59 = '<optional, up to 3 comma-separated k values for neighbor composition analysis, max 3 numbers>: \nexample -> 1,5,10'
 tooltip_60 = '<optional, fraction of cell type size to distinguish sparse vs dense spatial clusters>: \nexample -> 0.05'
 tooltip_61 = '<optional, yes or no to perform neighborhood cell type analysis>: \nexample -> yes'
+tooltip_62 = '<optional, minimum separation between GMM components in combined std units; below this value gmm_prob is set to NaN>: \nexample -> 0.5'
 
 
 
@@ -133,6 +134,7 @@ column = [[sg.Text('PIPEX data folder:', font=_FONT), sg.In(default_text=data_fo
           [sg.Text('  - Custom segmentation:', s=35, pad=((20,0), (0,0))), sg.In(default_text="", size=(30,1),disabled=True, key='-SEGMENTATION_CUSSEG-'), sg.FileBrowse(initial_folder=data_folder), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_46)],
           [sg.Text('  - Custom segmentation type:', s=35, pad=((20,0), (0,0))), sg.Combo(['full', 'nuc', 'mem'], default_value='full', key='-SEGMENTATION_CUSSTY-', disabled=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_35)],
           [sg.Text('  - Measure markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='GORASP2,AMY2A',s=40,disabled=True, key='-SEGMENTATION_MEASURE-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_8)],
+          [sg.Text('  - GMM min separation:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='0.5',s=20,disabled=True, key='-SEGMENTATION_GMMSEP-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_62)],
           [sg.Text('_'*85)],
           [sg.Checkbox('Downstream analysis', font=_FONT_BOLD, key='-ANALYSIS-', enable_events=True)],
           [sg.Text(' NOTE: requires previous \'Segmentation\' results')],
@@ -244,6 +246,7 @@ while True:
         window['-SEGMENTATION_CUSSEG-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_CUSSTY-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEASURE-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_GMMSEP-'].update(disabled=(not values['-SEGMENTATION-']))
         if (values['-SEGMENTATION-']):
             window['-SEGMENTATION_MEMMARK-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
             window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
@@ -393,6 +396,9 @@ if values['-SEGMENTATION-']:
     if (values['-SEGMENTATION_MEASURE-'] != ''):
         batch_list = (batch_list +
             ' -measure_markers="' + values['-SEGMENTATION_MEASURE-']) + '"'
+    if (values['-SEGMENTATION_GMMSEP-'] != ''):
+        batch_list = (batch_list +
+            ' -gmm_min_separation=' + values['-SEGMENTATION_GMMSEP-'])
 
 if values['-ANALYSIS-']:
     batch_list = (batch_list + '\n' +

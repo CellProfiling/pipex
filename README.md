@@ -138,6 +138,7 @@ There are currently available the following commands:
   - `-custom_segmentation=<optional, file path to a pre-made custom segmentation>` : example -> -custom_segmentation=/data/custom_seg.npy. **OBS**: accepts segmentations in numpy array or image mask file formats. Depending on your choice for the next parameter, `custom_segmentation_type`, this will ignores some/all the previous segmentation parameters, using this custom segmentation for measuring the markers. Understand that many generated output files will not exist
   - `-custom_segmentation_type=<optional, full | nuc | mem value to indicate the type of the custom segmentation attached>` : example -> -custom_segmentation_type=full. **OBS**: required if you are using a custom segmentation. Depending on your choice, PIPEX will plug-in your segmentation a the proper step (i.e. `nuc` will replace the Stardist segmentation part with your custom segmentation, but will then refine it with a membrane marker if so you have chonsen in your paramters)
   - `-measure_markers=<list of markers names before . in image files>` : example -> measure_markers=DAPI,CDH1,AMY2A,SST,GORASP2.
+  - `-gmm_min_separation=<optional, minimum separation between the two GMM components in combined standard deviation units>` : example -> -gmm_min_separation=0.5. **OBS**: controls when the GMM fit is trusted for computing the `_gmm_prob` score per cell. If the two fitted Gaussian components are closer than this value (i.e. the marker distribution is not clearly bimodal), `_gmm_prob` is set to NaN for all cells of that marker. Lower values accept weaker bimodality; higher values require a cleaner separation. Default is 0.5.
 
 - `analysis.py` : performs PIPEX broad scope analysis. MUST be run AFTER a segmentation. Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
@@ -158,8 +159,8 @@ There are currently available the following commands:
   - `-k_clusters=<optional, force k number of cluster in kmeans>` : example -> -k_clusters=10. **OBS**: if kmeans is activated, this will use the specified number of k clusters. The default is 10.
   - `-refine_clusters=<optional, yes or no to refine cluster results>` : example -> -refine_clusters=yes. **OBS**: this will perform a cluster refinement over leiden and/or kmeans unsupervised results based on the rules described in [cell_types.csv] 
   - `-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on>` : example -> -neigh_cluster_id=kmeans. **OBS**: this will perform a neighborhood analysis based on the specified calculated cluster column
-  - `-neigh_k_values=<optional, up to 3 comma-separated k values for neighbor composition analysis>` : example -> -neigh_k_values=1,5,10. **OBS**: controls the number of nearest neighbors used to compute cell type composition around each cell. Maximum 3 values; default is 1,5,10. See Annex 4.
-  - `-neigh_density_threshold=<optional, fraction of cell type population used to distinguish sparse from dense spatial clusters>` : example -> -neigh_density_threshold=0.05. **OBS**: a cell type cluster is considered dense if its average cluster size exceeds this fraction of the total cell count for that type. Default is 0.05. See Annex 4.
+  - `-neigh_k_values=<optional, up to 3 comma-separated k values for neighbor composition analysis>` : example -> -neigh_k_values=1,5,10. **OBS**: controls the number of nearest neighbors used to compute cell type composition around each cell. Maximum 3 values; default is 1,5,10. See Annex 5.
+  - `-neigh_density_threshold=<optional, fraction of cell type population used to distinguish sparse from dense spatial clusters>` : example -> -neigh_density_threshold=0.05. **OBS**: a cell type cluster is considered dense if its average cluster size exceeds this fraction of the total cell count for that type. Default is 0.05. See Annex 5.
 
 - `generate_geojson.py` : generates a GEOjson file to be imported in QuPath. MUST be run AFTER a segmentation and optionally after an analysis (if you want the default clustering). Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
@@ -436,7 +437,38 @@ There's a full [presentation](https://github.com/CellProfiling/pipex/blob/main/d
 
 
 
-Annex 3: Cluster refinement procedure
+Annex 3: Continuous marker scores
+----------------------------------
+
+For each marker listed in `-measure_markers`, PIPEX computes five continuous scores per cell and writes them as additional columns in `cell_data.csv`. All scores are derived from the marker's intensity image after a 1–99.5 percentile normalization to [0, 1].
+
+**`{marker}_local_90`**
+
+The 90th percentile of raw pixel intensities within the cell boundary. Unlike the mean (which is also stored in the `{marker}` column), this captures bright sub-cellular patches — useful for punctate or membrane markers where only a fraction of pixels carry the signal. Reported in the original, non-normalized intensity scale.
+
+**`{marker}_ratio_pixels`**
+
+The fraction of pixels inside the cell that exceed the global multi-Otsu threshold (3-class, lowest boundary) computed on the normalized marker image. Ranges from 0 to 1. A value of 0 means no pixel in the cell crosses the threshold; a value of 1 means every pixel does. This score is sensitive to within-cell heterogeneity and complements the mean-based scores.
+
+**`{marker}_otsu3`**
+
+Signed distance of the cell's normalized mean intensity from the global multi-Otsu threshold: `max(normalized_mean, 0) − otsu_threshold`. Positive values indicate the cell mean sits above the threshold; negative values indicate it sits below. The magnitude reflects how far from the boundary the cell falls. This is a continuous analog to a binary positive/negative call using Otsu thresholding.
+
+**`{marker}_triangle_score`**
+
+Signed distance of the cell's normalized mean intensity from the global Triangle threshold: `max(normalized_mean, 0) − triangle_threshold`. Same interpretation as `_otsu3` but using a different reference point. The Triangle method finds the threshold that maximizes the geometric triangle area under the histogram curve; it tends to cut higher than Otsu on strongly right-skewed distributions (a large negative population with a long positive tail), which is the typical shape for most spatial proteomics markers. Comparing `_otsu3` and `_triangle_score` can reveal markers where the two methods disagree, signaling a distribution that is harder to threshold cleanly.
+
+**`{marker}_gmm_prob`**
+
+Posterior probability that the cell belongs to the positive (higher-intensity) component of a two-component Gaussian Mixture Model fit to the normalized marker image. Ranges from 0 to 1. Values near 0.5 indicate the cell sits at the boundary between populations; values near 0 or 1 indicate a confident assignment. If the two GMM components are not sufficiently separated — controlled by `-gmm_min_separation` — the fit is considered unreliable and this score is set to `NaN` for all cells of that marker. Unlike the distance-based scores, `_gmm_prob` encodes the shape and width of both populations, so it naturally accounts for markers where the positive population is broad or overlapping.
+
+**Choosing a score for downstream analysis**
+
+The `-use_bin` parameter in `analysis.py` accepts any of these suffixes (e.g. `-use_bin=_gmm_prob`) to substitute the score columns for the raw intensity columns as input to clustering. Researchers can also apply their own threshold to any score column directly in `cell_data.csv` to make manual positive/negative calls.
+
+
+
+Annex 4: Cluster refinement procedure
 -------------------------------------
 
 PIPEX's analysis step includes the possibility to perform multiple refinements of the unsupervised clustering results (leiden and/or kmeans). This can help you with the manual annotation and merging of the clusters automatically discovered.
@@ -468,7 +500,7 @@ Here's and example of how a `cell_types.csv` file usually looks:
 </code>
 
 
-Annex 4: Neighborhood cell type analysis
+Annex 5: Neighborhood cell type analysis
 -----------------------------------------
 
 When `-neigh_cluster_id` is set, PIPEX computes two complementary views of how cell types are spatially organized around each other.
