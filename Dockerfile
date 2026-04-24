@@ -1,12 +1,11 @@
-FROM python:3.11.6-slim
+FROM python:3.12-slim
 
 WORKDIR /opt/pipex
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-RUN apt-get update && apt-get install -y python3-opencv
-RUN apt-get install -y libvips
+RUN apt-get update && apt-get install -y libvips
 
 # Temporary install gcc, needed for some of the requirements
 RUN apt-get install -y gcc g++

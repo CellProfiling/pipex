@@ -1,11 +1,12 @@
 import sys
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import argparse
 import datetime
 import pandas as pd
 import numpy as np
 import diplib as dip
 import geojson
+from pipex_utils import log, sanitize_marker_list, validate_marker_columns
 
 
 data_folder = os.environ.get('PIPEX_DATA')
@@ -16,49 +17,43 @@ cluster_color = ""
 
 #Function to handle the command line parameters passed
 def options(argv):
-    if len(argv) == 0:
-       print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-included_markers=<optional, list of present specific markers to include> : example -> -included_markers=AMY2A,SST,GORASP2\n\t-cluster_id=<optional, name of the column to add as cluster id information from cell_data.csv> : example -> -cluster_id=kmeans\n\t-cluster_color=<optional, name of the column to add as cluster information color from cell_data.csv> : example -> -cluster_color=kmeans_color', flush=True)
-       sys.exit()
-    else:
-        for arg in argv:
-            if arg.startswith('-help'):
-                print('generate_geojson.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-included_markers=<optional, list of present specific markers to include> : example -> -included_markers=AMY2A,SST,GORASP2\n\t-cluster_id=<optional, name of the column to add as cluster id information from cell_data.csv> : example -> -cluster_id=kmeans\n\t-cluster_color=<optional, name of the column to add as cluster information color from cell_data.csv> : example -> -cluster_color=kmeans_color', flush=True)
-                sys.exit()
-            elif arg.startswith('-data='):
-                global data_folder
-                data_folder = arg[6:]
-            elif arg.startswith('-included_markers='):
-                global included_markers
-                included_markers = arg[18:].split(",")
-            elif arg.startswith('-cluster_id='):
-                global cluster_id
-                cluster_id = arg[12:]
-            elif arg.startswith('-cluster_color='):
-                global cluster_color
-                cluster_color = arg[15:]
-
+    converted = ['--' + a[1:] if a.startswith('-') and not a.startswith('--') else a for a in argv]
+    parser = argparse.ArgumentParser(prog='generate_geojson.py')
+    parser.add_argument('--data', default=os.environ.get('PIPEX_DATA'),
+        help='path to images folder : example -> -data=/lab/projectX/images')
+    parser.add_argument('--included_markers', type=lambda s: s.split(','), default=[],
+        help='list of markers to include : example -> -included_markers=AMY2A,SST,GORASP2')
+    parser.add_argument('--cluster_id', default='',
+        help='column for cluster id information : example -> -cluster_id=kmeans')
+    parser.add_argument('--cluster_color', default='',
+        help='column for cluster color information : example -> -cluster_color=kmeans_color')
+    if not argv:
+        parser.print_help()
+        sys.exit()
+    return parser.parse_args(converted)
 
 if __name__ =='__main__':
-    options(sys.argv[1:])
+    args = options(sys.argv[1:])
+    data_folder = args.data
+    included_markers = sanitize_marker_list(args.included_markers)
+    cluster_id = args.cluster_id
+    cluster_color = args.cluster_color
 
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
-        f.close()
     with open(os.path.join(data_folder, 'log_settings_geojson.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time geojson = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
-        f.close()
 
-    print(">>> Start time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Start time generate_geojson")
 
     #Load segmentation data in numpy array format
-    labels = np.load(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'), allow_pickle=True)
+    labels = np.load(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'))
     df = pd.read_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'))
 
-    markers = []
     #Getting the list of marker names
     markers = list(df.columns.values)
     markers = markers[(df.columns.get_loc("y") + 1):]
@@ -74,19 +69,23 @@ if __name__ =='__main__':
     if len(included_markers) > 0:
         markers = included_markers
 
+    validate_marker_columns(df, markers)
+
     #calculate segmentation polygons via fast chaincodes from diplib
     chaincodes = dip.GetImageChainCodes(labels.astype('uint32'))
     borders = {}
     for chaincode in chaincodes:
         borders[chaincode.objectID] = np.array(chaincode.Polygon()).tolist()
-    print(">>> Labelled regions to approximate polygons conversion finished =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Labelled regions to approximate polygons conversion finished")
+
+    df = df.set_index('cell_id')
 
     #generating geojson data to import in qupath
     GEOdata = []
     for label in borders:
-        if label not in df['cell_id'].values:
+        if label not in df.index:
             continue
-        cell_row = (df['cell_id'] == label)
+        cell = df.loc[label]
         final_coords = borders[label]
         final_coords.append(final_coords[0])
         cell_data = {}
@@ -107,14 +106,14 @@ if __name__ =='__main__':
         for marker in markers:
             cell_data["properties"]["measurements"].append({
                 "name" : marker,
-                "value" : str(df[cell_row][marker].values[0])
+                "value" : float(cell[marker])
                 })
 
         #if cluster_id parameter is selected, add cluster_id and cluster_color
-        if cluster_id != '' and len(df[cell_row][cluster_id]) > 0:
+        if cluster_id != '' and cluster_id in df.columns:
             cell_data["properties"]["classification"] = {
-                "name": str(df[cell_row][cluster_id].values[0]),
-                "colorRGB": str(df[cell_row][cluster_color].values[0] if cluster_color != '' else '')
+                "name": str(cell[cluster_id]),
+                "colorRGB": str(cell[cluster_color] if cluster_color != '' else '')
                 }
         GEOdata.append(cell_data)
 
@@ -122,4 +121,4 @@ if __name__ =='__main__':
     with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.json'), 'w') as outfile:
         geojson.dump(GEOdata, outfile)
 
-    print(">>> End time generate_geojson =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("End time generate_geojson")

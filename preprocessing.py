@@ -1,20 +1,17 @@
 import sys
 import os
+import argparse
 import datetime
-import PIL.Image
 import numpy as np
-import math
-from tifffile import TiffFile
-from xml.etree import ElementTree
+from pipex_utils import iter_marker_images, log, sanitize_marker_list, validate_marker_files
 
 from skimage.filters import threshold_multiotsu
-from skimage.io import imsave, imread
+from skimage.io import imsave
 from skimage.transform import resize
 
 import cv2
 
 
-PIL.Image.MAX_IMAGE_PIXELS = 10000000000
 pipex_max_resolution = 30000
 if "PIPEX_MAX_RESOLUTION" in os.environ:
     pipex_max_resolution = int(os.environ.get('PIPEX_MAX_RESOLUTION'))
@@ -35,6 +32,7 @@ light_gradient = 0
 flatten_spots = 'no'
 balance_tiles = 'no'
 stitch_size = 0
+tophat_radius = 0
 
 
 def downscale_images(np_img):
@@ -47,29 +45,34 @@ def downscale_images(np_img):
                     pipex_scale_factor = i
                 else:
                     i = i * 2
-        return resize(np_img, (len(np_img) / pipex_scale_factor, len(np_img[0]) / pipex_scale_factor), order=0, preserve_range=True, anti_aliasing=False).astype('uint16')
+        return resize(np_img, (len(np_img) // pipex_scale_factor, len(np_img[0]) // pipex_scale_factor), order=0, preserve_range=True, anti_aliasing=False).astype('uint16')
     return np_img
 
 
 def upscale_results(marker):
     if pipex_scale_factor > 0:
-        image = PIL.Image.open(os.path.join(data_folder, "preprocessed", marker + ".tif"))
-        image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
-        image.save(os.path.join(data_folder, "preprocessed", marker + ".tif"))
+        path = os.path.join(data_folder, "preprocessed", marker + ".tif")
+        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        image = cv2.resize(image, (image.shape[1] * pipex_scale_factor, image.shape[0] * pipex_scale_factor), interpolation=cv2.INTER_NEAREST)
+        cv2.imwrite(path, image)
 
 
-def rescale_tile_intensity(x, mean_in, mean_factor, dev_in, dev_factor, bins):
-    if x == 0:
-        return
-    result = min(max(0.0, x + (mean_in * mean_factor) - mean_in), 1.0)
-    result_dev = ((x - mean_in) * dev_factor) - (x - mean_in)
-    result = min(max(0.0, result + result_dev if x >= mean_in else - result_dev), 1.0)
-    if result > bins[bin_max]:
-        result = bins[bin_max] + math.pow((result - bins[bin_max]) * 100, 0.6) / 100
-    elif result < bins[bin_min]:
-        result = bins[bin_min] - math.pow((bins[bin_min] - result) * 100, 0.6) / 100
-
-    return result
+def rescale_tile_intensity(tile, mean_in, mean_factor, dev_in, dev_factor, bins):
+    mask = tile != 0
+    result = np.clip(tile + mean_in * (mean_factor - 1), 0.0, 1.0)
+    result_dev = (tile - mean_in) * (dev_factor - 1)
+    result = np.where(tile >= mean_in,
+                      np.clip(result + result_dev, 0.0, 1.0),
+                      np.clip(-result_dev, 0.0, 1.0))
+    above_max = result > bins[bin_max]
+    result = np.where(above_max,
+                      bins[bin_max] + np.power(np.maximum(result - bins[bin_max], 0) * 100, 0.6) / 100,
+                      result)
+    below_min = result < bins[bin_min]
+    result = np.where(below_min,
+                      bins[bin_min] - np.power(np.maximum(bins[bin_min] - result, 0) * 100, 0.6) / 100,
+                      result)
+    return np.where(mask, result, tile)
 
 
 def apply_tile_compensation(f_name, np_img, bins, tile_data, local_tile_size, local_stitch_size):
@@ -88,10 +91,10 @@ def apply_tile_compensation(f_name, np_img, bins, tile_data, local_tile_size, lo
                 curr_mean = np.mean(values)
                 curr_dev = np.std(values)
 
-                np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)] = np.reshape(np.array([rescale_tile_intensity(x, curr_mean, mean_factor, curr_dev, dev_factor, bins) for x in np.ravel(tile)]), (local_tile_size, local_tile_size))
+                np_img[(row * local_tile_size):((row + 1) * local_tile_size), (column * local_tile_size):((column + 1) * local_tile_size)] = rescale_tile_intensity(tile, curr_mean, mean_factor, curr_dev, dev_factor, bins)
 
     if tile_size == local_tile_size:
-        print(">>> Balanced tiles for image",f_name,"=",datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
+        log("Balanced tiles for image " + f_name)
 
     if local_stitch_size > 0:
         for row in range(num_rows):
@@ -116,7 +119,7 @@ def apply_tile_compensation(f_name, np_img, bins, tile_data, local_tile_size, lo
                         np_img[streg_min_y:streg_max_y, streg_min_x:streg_max_x] = cv2.GaussianBlur(stitch, (kernel_size, kernel_size), 0)
 
         if tile_size == local_tile_size:
-            print(">>> Smoothed stitched lines for image",f_name,"=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
+            log("Smoothed stitched lines for image " + f_name)
 
 
 def generate_tile_compensation_data(np_img, bins, local_tile_size):
@@ -156,24 +159,15 @@ def generate_tile_compensation_data(np_img, bins, local_tile_size):
 
             tile_data['tiles'][tile_row][tile_column] = curr_subtile_data
 
-    for row in tile_data['tiles']:
-        for curr_data in row:
-            if curr_data['samples'] == 0:
-                continue
-            if not 'chosen' in tile_data:
-                tile_data['chosen'] = curr_data
-            else:
-                if curr_data['samples'] > tile_data['chosen']['samples']:
-                    tile_data['chosen'] = curr_data
+    valid_tiles = [curr_data for row in tile_data['tiles'] for curr_data in row if curr_data['samples'] > 0]
+    if valid_tiles:
+        median_mean = np.median([t['mean'] for t in valid_tiles])
+        tile_data['chosen'] = min(valid_tiles, key=lambda t: abs(t['mean'] - median_mean))
 
     if tile_size == local_tile_size:
-        print(">>> Calculated reference tiles balance =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        log("Calculated reference tiles balance")
 
     return tile_data
-
-def rescale_gradient_intensity(intensity, ratio):
-    return min(max(0, intensity * ratio), 1.0)
-
 
 def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
     num_rows = int(len(np_img) / tile_size)
@@ -193,17 +187,16 @@ def apply_tile_gradient_compensation(f_name, np_img, bins, gradient_data):
 
                             final_ratio = 1 + (bins[bin_max] * (tile_ratio / kernel_ratio)) / bins[bin_max]
 
-                            for i1 in range(kernel_size):
-                                for i2 in range(kernel_size):
-                                    np_img[tile_kernel_sy + i1][tile_kernel_sx + i2] = rescale_gradient_intensity(np_img[tile_kernel_sy + i1][tile_kernel_sx + i2], final_ratio)
+                            np_img[tile_kernel_sy:tile_kernel_sy + kernel_size, tile_kernel_sx:tile_kernel_sx + kernel_size] = np.clip(
+                                np_img[tile_kernel_sy:tile_kernel_sy + kernel_size, tile_kernel_sx:tile_kernel_sx + kernel_size] * final_ratio, 0, 1.0)
 
                 tile = np_img[(row * tile_size):((row + 1) * tile_size), (column * tile_size):((column + 1) * tile_size)]
                 subtile_data = generate_tile_compensation_data(tile, bins, kernel_size)
                 apply_tile_compensation('', tile, bins, subtile_data, kernel_size, kernel_size / 10)
 
-    imsave(os.path.join(data_folder, "preprocessed", os.path.splitext(file)[0] + "_gradient.jpg"), np.uint8(np_img * 255))
+    imsave(os.path.join(data_folder, "preprocessed", os.path.splitext(f_name)[0] + "_gradient.jpg"), np.uint8(np_img * 255))
 
-    print(">>> Applied gradient fix for image",f_name,"=", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),flush=True)
+    log("Applied gradient fix for image " + f_name)
 
 
 def generate_tile_gradient_data(np_img, bins, tile_size):
@@ -242,8 +235,8 @@ def generate_tile_gradient_data(np_img, bins, tile_size):
                         samples = 1
                         tile_gradient_info['ratio_gradient'] = -1
                     tile_gradient_data[row_kernel].append(tile_gradient_info)
-                    if max_gradient == 0 or tile_gradient_info['ratio_gradient'] > 0 and max_gradient < tile_gradient_info['ratio_gradient'] * math.log(samples):
-                        max_gradient = tile_gradient_info['ratio_gradient'] * math.log(samples)
+                    if max_gradient == 0 or tile_gradient_info['ratio_gradient'] > 0 and max_gradient < tile_gradient_info['ratio_gradient'] * np.log(samples):
+                        max_gradient = tile_gradient_info['ratio_gradient'] * np.log(samples)
                         ratio_gradient = tile_gradient_info['ratio_gradient']
                         max_gradient_kernel = [row_kernel, column_kernel]
 
@@ -253,7 +246,7 @@ def generate_tile_gradient_data(np_img, bins, tile_size):
             tile_gradient['max_gradient_kernel'] = max_gradient_kernel
             gradient_data[row][column] = tile_gradient
 
-    print(">>> Calculated reference tiles gradient =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Calculated reference tiles gradient")
 
     return gradient_data
 
@@ -271,28 +264,37 @@ def apply_thresholds(marker, np_img, threshold_min, threshold_max):
         imsave(os.path.join(data_folder, "preprocessed", marker + "_threshold_top.jpg"), np.uint8(np_thres * 255))
         del np_thres
         np_img[np_img > threshold_max] = 0
-    print(">>> Applied min and max thresholds =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Applied min and max thresholds")
 
 
 def preprocess_image(marker, marker_img):
-    print(">>> Preprocessing",marker,"start =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-    #normalizing images
-    np_img = (marker_img - np.amin(marker_img)) / (np.amax(marker_img) - np.amin(marker_img))
+    log("Preprocessing " + marker + " start")
+    p_low, p_high = np.percentile(marker_img, (1, 99.5))
+    if p_high == p_low:
+        print(">>> WARNING: marker", marker, "has uniform intensity, skipping", flush=True)
+        return
+    np_img = np.clip((marker_img - p_low) / (p_high - p_low), 0.0, 1.0)
 
     apply_thresholds(marker, np_img, thres_min, thres_max)
 
+    if tophat_radius > 0:
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (tophat_radius * 2 + 1, tophat_radius * 2 + 1))
+        np_img = np.clip(cv2.morphologyEx(np_img.astype(np.float32), cv2.MORPH_TOPHAT, kernel).astype(np.float64), 0.0, 1.0)
+        log("Applied top-hat background subtraction")
+
     global otsu_threshold_levels
     if otsu_threshold_levels >=0:
+        np_img_denoised = cv2.GaussianBlur(np_img.astype(np.float32), (5, 5), 0).astype(np.float64)
         final_c_otsu = []
         if otsu_threshold_levels == 0:
-            c_otsu = threshold_multiotsu(np_img, 3)
+            c_otsu = threshold_multiotsu(np_img_denoised, 3)
             final_c_otsu = c_otsu.copy()
             c_otsu = np.insert(c_otsu, 0, 0.0)
             regions = np.digitize(np_img, bins=c_otsu)
             regions = np.reshape(np.array([c_otsu[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
             imsave(os.path.join(data_folder, "preprocessed", marker + "_otsu_3.jpg"), np.uint8(regions * 255))
     
-            c_otsu = threshold_multiotsu(np_img, 4)
+            c_otsu = threshold_multiotsu(np_img_denoised, 4)
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [2])
             temp_otsu = np.insert(temp_otsu, 0, 0.0)
@@ -315,7 +317,7 @@ def preprocess_image(marker, marker_img):
             regions = np.reshape(np.array([temp_otsu[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
             imsave(os.path.join(data_folder, "preprocessed", marker + "_otsu_4_2-3.jpg"), np.uint8(regions * 255))
     
-            c_otsu = threshold_multiotsu(np_img, 5)
+            c_otsu = threshold_multiotsu(np_img_denoised, 5)
             temp_otsu = c_otsu.copy()
             temp_otsu = np.delete(temp_otsu, [2, 3])
             temp_otsu = np.insert(temp_otsu, 0, 0.0)
@@ -358,11 +360,11 @@ def preprocess_image(marker, marker_img):
             regions = np.reshape(np.array([temp_otsu[x - 1] for x in np.ravel(regions)]), (len(np_img), len(np_img[0])))
             imsave(os.path.join(data_folder, "preprocessed", marker + "_otsu_5_3-4.jpg"), np.uint8(regions * 255))
         else:
-            final_c_otsu = threshold_multiotsu(np_img, otsu_threshold_levels)
+            final_c_otsu = threshold_multiotsu(np_img_denoised, otsu_threshold_levels)
             temp_otsu = final_c_otsu.copy()
             delete_intervals = []
             if bin_min > 1:
-                delete_intervals = range(0, bin_min - 1)
+                delete_intervals = list(range(0, bin_min - 1))
             if bin_max < otsu_threshold_levels - 1:
                 delete_intervals.extend(range(bin_max, otsu_threshold_levels - 1))
             temp_otsu = np.delete(temp_otsu, delete_intervals)
@@ -374,7 +376,7 @@ def preprocess_image(marker, marker_img):
         np_img[np_img < final_c_otsu[bin_min]] = 0
         if flatten_spots == "yes":
             np_img[np_img > final_c_otsu[bin_max]] = final_c_otsu[bin_max]
-        print(">>> Otsu thresholded result image calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        log("Otsu thresholded result image calculated")
 
         if balance_tiles == "yes":
             final_c_otsu = np.insert(final_c_otsu, 0, 0.0)
@@ -387,128 +389,92 @@ def preprocess_image(marker, marker_img):
             apply_tile_compensation(marker, np_img, final_c_otsu, tile_data, tile_size, stitch_size)
 
     if exposure != 1.0:
-        np_img = np.reshape(np.array([(x * exposure) for x in np.ravel(np_img)]), (len(np_img), len(np_img[0])))
-        np_img = np.clip(np_img, 0.0, 1.0)
-        print(">>> Exposure calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        np_img = np.clip(np_img * exposure, 0.0, 1.0)
+        log("Exposure calculated")
 
     imsave(os.path.join(data_folder, "preprocessed", marker + ".tif"), np.uint16(np_img * 65535))
-    print(">>> Preprocessed result image",marker + ".tif","saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Preprocessed result image " + marker + ".tif saved")
 
 
 #Function to handle the command line parameters passed
 def options(argv):
-    if len(argv) == 0:
-       print ('preprocessing.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to \'./data\'> : example -> -data=/lab/projectX/images\n\t-preprocess_markers=<optional, list of present specific markers to preprocess> : example -> -preprocess_markers=DAPI,CTNNB1,AMY2A,SST\n\t-threshold_min=<number, percentage of intensity> : example -> -threshold_min=1\n\t-threshold_max=<number, percentage of intensity> : example -> -threshold_max=99\n\t-otsu_threshold_levels=<otsu classes, i.e 3 OR otsu classes and specific bin filtering, i.e 5:1:2> : example -> -otsu_threshold_levels=3\n\t-flatten_spots=<yes or no> : example -> -flatten_spots=no\n\t-tile_size=<number of pixels> : example -> -tile_size=1844\n\t-light_gradient=<number> : example -> -light_gradient=3\n\t-balance_tiles=<yes or no> : example -> -balance_tiles=yes\n\t-stitch_size=<number of pixels> : example -> -stitch_size=20\n\t-exposure=<number, percentage of the base intensity> : example -> -exposure=300', flush=True)
-       sys.exit()
-    else:
-        for arg in argv:
-            if arg.startswith('-help'):
-                print ('preprocessing.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to \'./data\'> : example -> -data=/lab/projectX/images\n\t-preprocess_markers=<optional, list of present specific markers to preprocess> : example -> -preprocess_markers=DAPI,CTNNB1,AMY2A,SST\n\t-threshold_min=<number, percentage of intensity> : example -> -threshold_min=1\n\t-threshold_max=<number, percentage of intensity> : example -> -threshold_max=99\n\t-otsu_threshold_levels=<otsu classes, i.e 3 OR otsu classes and specific bin filtering, i.e 5:1:2> : example -> -otsu_threshold_levels=3\n\t-flatten_spots=<yes or no> : example -> -flatten_spots=no\n\t-tile_size=<number of pixels> : example -> -tile_size=1844\n\t-light_gradient=<number> : example -> -light_gradient=3\n\t-balance_tiles=<yes or no> : example -> -balance_tiles=yes\n\t-stitch_size=<number of pixels> : example -> -stitch_size=20\n\t-exposure=<number, percentage of the base intensity> : example -> -exposure=300', flush=True)
-                sys.exit()
-            elif arg.startswith('-data='):
-                global data_folder
-                data_folder = arg[6:]
-            elif arg.startswith('-preprocess_markers='):
-                global preprocess_markers
-                preprocess_markers = [x.strip() for x in arg[20:].split(",")]
-            elif arg.startswith('-threshold_min='):
-                global thres_min
-                thres_min = float(arg[15:]) / 100
-            elif arg.startswith('-threshold_max='):
-                global thres_max
-                thres_max = float(arg[15:]) / 100
-            elif arg.startswith('-otsu_threshold_levels='):
-                global otsu_threshold_levels
-                global bin_min
-                global bin_max
-                par_otl = arg[23:]
-                if par_otl != "":
-                    if ":" in par_otl:
-                        otsu_threshold_levels = int(par_otl.split(":")[0])
-                        bin_min = int(par_otl.split(":")[1])
-                        bin_max = int(par_otl.split(":")[2])
-                    else:
-                        otsu_threshold_levels = int(par_otl)
-                        bin_max = otsu_threshold_levels - 1
-            elif arg.startswith('-flatten_spots='):
-                global flatten_spots
-                flatten_spots = arg[15:]
-            elif arg.startswith('-tile_size='):
-                global tile_size
-                tile_size = int(arg[11:])
-            elif arg.startswith('-light_gradient='):
-                global light_gradient
-                light_gradient = 2 ** int(arg[16:])
-            elif arg.startswith('-balance_tiles='):
-                global balance_tiles
-                balance_tiles = arg[15:]
-            elif arg.startswith('-stitch_size='):
-                global stitch_size
-                stitch_size = int(arg[13:])
-            elif arg.startswith('-exposure='):
-                global exposure
-                exposure = int(arg[10:]) / 100
+    def _parse_otsu(s):
+        if ':' in s:
+            parts = s.split(':')
+            return int(parts[0]), int(parts[1]), int(parts[2])
+        n = int(s)
+        return n, 0, n - 1
+
+    converted = ['--' + a[1:] if a.startswith('-') and not a.startswith('--') else a for a in argv]
+    parser = argparse.ArgumentParser(prog='preprocessing.py')
+    parser.add_argument('--data', default='./data',
+        help="path to images folder : example -> -data=/lab/projectX/images")
+    parser.add_argument('--preprocess_markers', type=lambda s: [x.strip() for x in s.split(',')], default=[],
+        help='list of markers to preprocess : example -> -preprocess_markers=DAPI,CTNNB1,AMY2A,SST')
+    parser.add_argument('--threshold_min', type=lambda s: float(s) / 100, default=0.0,
+        help='percentage of intensity : example -> -threshold_min=1')
+    parser.add_argument('--threshold_max', type=lambda s: float(s) / 100, default=1.0,
+        help='percentage of intensity : example -> -threshold_max=99')
+    parser.add_argument('--otsu_threshold_levels', type=_parse_otsu, default=None, metavar='LEVELS[:MIN:MAX]',
+        help='otsu classes, e.g. 3 or with bin filtering 5:1:2 : example -> -otsu_threshold_levels=3')
+    parser.add_argument('--flatten_spots', choices=['yes', 'no'], default='no',
+        help='flatten spots : example -> -flatten_spots=no')
+    parser.add_argument('--tile_size', type=int, default=0,
+        help='number of pixels : example -> -tile_size=1844')
+    parser.add_argument('--light_gradient', type=lambda s: 2 ** int(s), default=0,
+        help='light gradient correction level : example -> -light_gradient=3')
+    parser.add_argument('--balance_tiles', choices=['yes', 'no'], default='no',
+        help='balance tiles : example -> -balance_tiles=yes')
+    parser.add_argument('--stitch_size', type=int, default=0,
+        help='number of pixels : example -> -stitch_size=20')
+    parser.add_argument('--tophat_radius', type=int, default=0,
+        help='tophat filter radius in pixels : example -> -tophat_radius=10')
+    parser.add_argument('--exposure', type=lambda s: int(s) / 100, default=1.0,
+        help='percentage of base intensity : example -> -exposure=300')
+    if not argv:
+        parser.print_help()
+        sys.exit()
+    return parser.parse_args(converted)
 
 
 if __name__ =='__main__':
-    options(sys.argv[1:])
+    args = options(sys.argv[1:])
+    data_folder = args.data
+    preprocess_markers = sanitize_marker_list(args.preprocess_markers)
+    thres_min = args.threshold_min
+    thres_max = args.threshold_max
+    if args.otsu_threshold_levels is not None:
+        otsu_threshold_levels, bin_min, bin_max = args.otsu_threshold_levels
+    flatten_spots = args.flatten_spots
+    tile_size = args.tile_size
+    light_gradient = args.light_gradient
+    balance_tiles = args.balance_tiles
+    stitch_size = args.stitch_size
+    tophat_radius = args.tophat_radius
+    exposure = args.exposure
 
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
-        f.close()
     with open(os.path.join(data_folder, 'log_settings_preprocessing.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time preprocessing = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
-        f.close()
 
-    print(">>> Start time preprocessing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Start time preprocessing")
+
+    validate_marker_files(data_folder, preprocess_markers)
 
     try:
         os.mkdir(os.path.join(data_folder, 'preprocessed'))
     except OSError as error:
         print('>>> preprocessed folder already exists, overwriting results', flush=True)
 
-    for file in os.listdir(data_folder):
-        file_path = os.path.join(data_folder, file)
-        if os.path.isdir(file_path):
-            continue
+    def handle_preprocess(marker, raw_img):
+        preprocess_image(marker, downscale_images(raw_img))
+        upscale_results(marker)
 
-        next_try = False
-        try:
-            with TiffFile(file_path) as tif:
-                if len(tif.series[0].pages) == 1:
-                    for marker in preprocess_markers:
-                        if marker + '.' in file:
-                            preprocess_image(marker, downscale_images(next(iter(tif.series[0].pages)).asarray()))
-                            upscale_results(marker)
-                            break
-                else:
-                    #Akoya's qptiff
-                    for page in tif.series[0].pages:
-                        biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
-                        if biomarker in preprocess_markers:
-                            preprocess_image(biomarker, downscale_images(page.asarray()))
-                            upscale_results(marker)
-        except Exception as e:
-            print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
-            print('>>> ', e, flush=True)
-            next_try = True
+    iter_marker_images(data_folder, preprocess_markers, handle_preprocess)
 
-        if next_try:
-            try:
-                for marker in preprocess_markers:
-                    if marker + '.' in file:
-                        curr_image = np.array(PIL.Image.open(file_path))
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        preprocess_image(marker, downscale_images(curr_image))
-                        upscale_results(marker)
-                        break
-            except Exception as e:
-                print('>>> Could not read image ' + file_path, flush=True)
-                print('>>> ', e, flush=True)
-
-    print(">>> End time preprocessing =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("End time preprocessing")

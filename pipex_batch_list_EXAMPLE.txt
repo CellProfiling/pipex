@@ -6,11 +6,11 @@ swap 8
 
 segmentation.py -data=/home/lab/pipeline/data -nuclei_marker=DAPI -nuclei_diameter=20 -nuclei_expansion=20 -membrane_marker=CDH1 -membrane_diameter=25 -measure_markers=DAPI,CDH1,HLA-DR,CHGA,KRT5,IAPP,ACTA2,GORASP2,EZR,SST,TUFM,S100B,HSP90B1,Ki67,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG
 
-analysis.py -data=/home/lab/pipeline/data -analysis_markers=HLA-DR,CHGA,KRT5,IAPP,ACTA2,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG -image_size=2000 -leiden=yes
+analysis.py -data=/home/lab/pipeline/data -analysis_markers=HLA-DR,CHGA,KRT5,IAPP,ACTA2,RBP4,AMY2A,NEFM,Panck,HLA-DR,GCG -image_size=2000 -leiden=yes -leiden_res=0.5
 
 #need full TissUUmaps integration, with cluster
 
-generate_geojson.py -data=/home/lab/pipeline/data -expand=yes
+generate_geojson.py -data=/home/lab/pipeline/data -cluster_id=leiden -cluster_color=leiden_color
 
 generate_tissuumaps.py -data=/home/lab/pipeline/data -include_marker_images=DAPI,CDH1,HLA-DR,CHGA,KRT5 -include_geojson=yes -compress_geojson=yes -include_html=yes
 

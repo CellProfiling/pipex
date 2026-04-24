@@ -28,7 +28,7 @@ Why PIPEX
 
   - Written entirely in python language, not tied to any specific program that might change and/or be discontinued in the future. Not even really tied to CODEX, can process any arbitrary set of images in a folder! 
   - More accurate cell segmentation compared to regular Stardist if a good membrane marker is provided.
-  - PIPEX's generic results can be easily imported to other more graphical o interactive programs. As examples, PIPEX already includes a script to import the cell segmentation (and clusters, if calculated) to QuPath, a post-filtering option to adapt the mask to Leica's LMD, etc...
+  - PIPEX's generic results can be easily imported to other more graphical or interactive programs. As examples, PIPEX already includes a script to import the cell segmentation (and clusters, if calculated) to QuPath, a post-filtering option to adapt the mask to Leica's LMD, etc...
   - The broad scope of the implemented downstream analysis automatically generates a large amount of labelled plots and data that can provide unexpected insights or be easily discarded otherwise.
   - Memory efficient, 10k resolution images can be handled by a 16GB regular machine without GPU. Virtually no size limit in linux through automatic swap memory management and/or if you enforce a maximum resolution which PIPEX will use to automatically downscale the images.
   - Quite fast: a full CODEX run of 20 antibodies with 6k resolution images takes 10min to fully process by PIPEX in 16Gb laptop (4min segmentation | 2min analysis | 1min QuPath conversion | 1min mask post-filtering).
@@ -114,11 +114,13 @@ There are currently available the following commands:
   - `-preprocess_markers=<optional, list of present specific markers to pre-process>` : example -> -preprocess_markers=AMY2A,SST,GORASP2
   - `-threshold_min=<number, percentage of intensity>` : example -> -threshold_min=1. **OBS**: this is minimum percentage of the global intensity (the image limit) from which all intensities below will be deleted.
   - `-threshold_max=<number, percentage of intensity>` : example -> -threshold_min=99. **OBS**: this is maximum percentage of the global intensity (the image limit) from which all intensities above will be deleted.
+  - `-tophat_radius=<number of pixels, 0 = disabled>` : example -> -tophat_radius=30. **OBS**: applies a morphological top-hat background subtraction using a circular structuring element of the specified radius. This removes slowly-varying background (autofluorescence, uneven staining) while preserving signal structures such as cells. The radius should be larger than the structures you want to keep but smaller than the background variation scale — a good starting point is ~1.5× the expected cell radius.
   - `-otsu_threshold_levels=<otsu classes, i.e 3 OR otsu classes and specific bin filtering, i.e 5:1:2>` : example -> -otsu_threshold_levels=3 **OBS**: this is the number of otsu thresholds to use while processing the image and the two ones selected as main intervals. If you use 0 it will default to 3:1:2 but provide a sample of many otsu intervals as output files.
   - `-balance_tiles=<yes or no>` : example -> -balance_tiles=yes. **OBS**: this activates the option to try to homogenize the intensities of all the tiles
   - `-tile_size=<number of pixels>` : example -> -tile_size=1844. **OBS**: this is the size of the image square tiles
   - `-light_gradient=<number, factor of complexity of light issues [1 to 4 should be enough]>` : example -> -light_gradient=3. **OBS**: this is the exponential value of squared sub-tiles that will be used to try to reduce the light gradients in each tile.
   - `-stitch_size=<number of pixels>` : example -> -stitch_size=20. **OBS**: this specifies the width of the region to use while performing the smooth operation in the tile cuts
+  - `-flatten_spots=<yes or no to flatten bright spots>` : example -> -flatten_spots=no. **OBS**: this applies an additional flattening step to reduce very bright isolated spots in the image
   - `-exposure=<number, percentage of the base intensity>` : example -> -exposure=150. **OBS**: this increases the exposure of the image once it has been preprocessed
 
 - `segmentation.py` : performs PIPEX segmentation. Uses the following parameters:
@@ -144,18 +146,20 @@ There are currently available the following commands:
   - `-use_bin=<optional, list of comma-separated suffixes for the markers to use as input columns for the analysis>` : example -> -use_bin=_local_90. **OBS**: this will use the associated binarized columns (or any self-created suffixed column) for each stated marker ([name of the marker] + [element in use_bin list]) to calculate the selected clustering methods.
   - `-cellsize_max=<optional, percentage of biggest cells to remove>` : example -> -cellsize_max=5. **OBS**: this refers to the percentge of the biggest cells to be remove for all analysis results
   - `-cellsize_min=<optional, percentage of smallest cells to remove>` : example -> -cellsize_min=5. **OBS**: this refers to the percentge of the smallest cells to be remove for all analysis results
-  - `-custom_filter=<optional, yes or no to apply custom Cell Profiling lab's biomarkers filtering>` : example -> -custom_filter=yes. **OBS**: this will filter known biomarkers following Cell Profiling lab common tweaks.
   - `-log_norm=<optional, yes or no to apply log n + 1 normalization>` : example -> -log_norm=yes. **OBS**: this will apply a log1p normalization to the markers intensities
   - `-z_norm=<optional, yes or no to apply z normalization>` : example -> -z_norm=yes. **OBS**: this will apply a z normalization to the markers intensities
   - `-minmax_norm=<optional, yes or no to apply 0 to 1 re-scale normalization>` : example -> -minmax_norm=yes. **OBS**: this will apply a min-max normalization to the markers intensities
-  - `-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by>` : example -> -batch_corr=batch_id. **OBS**: this is the name of the column in the cell_data.csv that differentiates each experiment batch, so they can be separated to perform ComBat batch correction.
-  - `-quantile_norm=<optional, yes or no to apply quantile normalization>` : example -> -quantile_norm=yes. **OBS**: this will apply an additional quantile normalization to the markers intensities
+  - `-batch_corr=<optional, name of the column in cell_data.csv to perform batch correction by>` : example -> -batch_corr=batch_id. **OBS**: this is the name of the column in the cell_data.csv that differentiates each experiment batch, so they can be separated to perform ComBat batch correction. **WARNING**: ComBat was designed for bulk expression data and may over-correct in per-cell imaging data; it can also produce negative values after a previous normalization step.
+  - `-quantile_norm=<optional, yes or no to apply quantile normalization>` : example -> -quantile_norm=yes. **OBS**: this will apply an additional quantile normalization to the markers intensities. **WARNING**: assumes all markers share the same expression distribution; can distort biological signal if markers have very different prevalence across cell types.
   - `-leiden=<optional, yes or no to perform leiden clustering>` : example -> -leiden=yes. **OBS**: this will perform a leiden clustering and all its associated data and plots
+  - `-leiden_res=<optional, leiden clustering resolution>` : example -> -leiden_res=0.5. **OBS**: controls cluster granularity — higher values produce more clusters. Typical range is 0.1–2.0; for spatial proteomics panels (10–40 markers) a value around 0.3–0.5 is recommended. Default is 0.5.
   - `-kmeans=<optional, yes or no to perform kmeans clustering>` : example -> -kmeans=yes. **OBS**: this will perform a kmeans clustering and all its associated data and plots.
-  - `-elbow=<optional, yes or no to show elbow analysis for kmeans>` : example -> -elbow=yes. **OBS**: if kmeans is activated, this will perform a series of 20 kmeans clustering to display the resulting distortion and inertia plots.
+  - `-k_estimation=<optional, yes or no to run k estimation analysis for kmeans>` : example -> -k_estimation=yes. **OBS**: if kmeans is activated, this will perform a series of 20 kmeans fits (k=1 to 19) and produce three plots to help choose k: distortion (elbow method), inertia, and silhouette score per k (higher silhouette = better-separated clusters).
   - `-k_clusters=<optional, force k number of cluster in kmeans>` : example -> -k_clusters=10. **OBS**: if kmeans is activated, this will use the specified number of k clusters. The default is 10.
   - `-refine_clusters=<optional, yes or no to refine cluster results>` : example -> -refine_clusters=yes. **OBS**: this will perform a cluster refinement over leiden and/or kmeans unsupervised results based on the rules described in [cell_types.csv] 
   - `-neigh_cluster_id=<optional, cluster column name to base the neighborhood analysis on>` : example -> -neigh_cluster_id=kmeans. **OBS**: this will perform a neighborhood analysis based on the specified calculated cluster column
+  - `-neigh_k_values=<optional, up to 3 comma-separated k values for neighbor composition analysis>` : example -> -neigh_k_values=1,5,10. **OBS**: controls the number of nearest neighbors used to compute cell type composition around each cell. Maximum 3 values; default is 1,5,10. See Annex 4.
+  - `-neigh_density_threshold=<optional, fraction of cell type population used to distinguish sparse from dense spatial clusters>` : example -> -neigh_density_threshold=0.05. **OBS**: a cell type cluster is considered dense if its average cluster size exceeds this fraction of the total cell count for that type. Default is 0.05. See Annex 4.
 
 - `generate_geojson.py` : generates a GEOjson file to be imported in QuPath. MUST be run AFTER a segmentation and optionally after an analysis (if you want the default clustering). Uses the following parameters:
   - `-data=</path/to/images/folder>` : example -> -data=/home/lab/pipeline/data. **OBS**: this is the data folder
@@ -170,6 +174,11 @@ There are currently available the following commands:
   - `-tile_size=<optional, number of pixels of each square tile segmented>` : example -> -tile_size=2048. **OBS**: the tiles will always have a square shape (but see `-extend` option)
   - `-tile_overlap=<optional, number of pixels of surrounding overlap of each square tile segmented>` : example -> -tile_overlap=128. **OBS**: this is a fix pixel size option as oposed as `-tile_percentage`
   - `-tile_percentage_overlap=<optional, tile size\'s percentage of surrounding overlap of each square tile segmented>` : example -> -tile_percentage_overlap=10. **OBS**: this is a pixel percentage size option as oposed as `-tile_overlap`
+  - `-lmd=<yes or no to generate an LMD XML cutting file>` : example -> -lmd=no. **OBS**: generates an XML file for Leica's Laser Microdissection software from the filtered segmentation
+  - `-shape_dilation=<optional, number of pixels to dilate each shape>` : example -> -shape_dilation=0. **OBS**: expands each cell shape outline by the given number of pixels before writing the LMD XML
+  - `-convolution_smoothing=<optional, number of datapoints for shape smoothing>` : example -> -convolution_smoothing=15. **OBS**: controls the smoothing of cell contours in the LMD output; higher values produce smoother shapes
+  - `-path_optimization=<optional, none, hilbert or greedy>` : example -> -path_optimization=none. **OBS**: selects the strategy to order the cutting path between shapes, which can reduce total cutting time on the microscope
+  - `-distance_heuristic=<optional, nearest-neighbour distance in pixels for merging shapes>` : example -> -distance_heuristic=300. **OBS**: shapes whose nearest neighbours are within this distance are merged into a single cutting group, reducing unnecessary stage movements
   - `-tile_relabel=<yes or no to relabel sequentially the tile segments>` : example -> -tile_relabel=no. **OBS**: special option to have the segments of each tile relabeled sequentially, which may be useful to have possible unique identifiers per tile
   - `-extend_tile=<yes or no to have bigger border tiles>` : example -> -extend_tile=no. **OBS**: special option to have the last right and bottom border tile of the image extended to reach their limit if the image length and width does not match an exact tile size multiplier
   
@@ -229,6 +238,9 @@ This will generate the following sub-folders and items inside the data folder:
   - `cell_data_norm.csv`: filtered and normalized version of `cell_data.csv` general file. **OBS** this file will only be present if you have run the analysis command)
   - `cell_data_markers.csv`: aggregated data for each of the analyzed markers. **OBS** this file will only be present if you have run the analysis command)
   - `anndata.h5ad`: AnnData object containing the analysis output. **OBS** this file will only be present if you have run the analysis command)
+  - `{neigh_cluster_id}_neighborhood_analysis_cell_types_heatmap.jpg`: heatmap of cell type neighbor composition at each configured k value. **OBS** this file will only be present if you have run the analysis command with `-neigh_cluster_id`)
+  - `{neigh_cluster_id}_neighborhood_analysis_cell_types_stackbar.jpg`: stacked bar chart of cell type neighbor composition at each configured k value. **OBS** this file will only be present if you have run the analysis command with `-neigh_cluster_id`)
+  - `{neigh_cluster_id}_spatial_distribution.csv`: per cell type spatial distribution classification (scattered sparsely, clustered sparsely, or clustered densely). **OBS** this file will only be present if you have run the analysis command with `-neigh_cluster_id`)
   - `anndata_TissUUmaps.h5ad`: TissUUmaps project file. **OBS** this file will only be present if you have run the generate_tissuumaps command)
 - `analysis/quality_control` folder: it contains the following items:
   - Several image files: these are image representations of intermediate steps of the cell segmentation process. Useful as post-verification and/or to refine the parameters if the result is not what you expected.
@@ -394,6 +406,7 @@ PIPEX offers an optional preprocessing step to try to fix CODEX's (and other mul
 
 Preprocessing offers, at high level, the following options (in order):
   - *Threshold intensities removal*: select a minimum and/or maximum percentage of absolute intensity to be removed from the image. Useful to clean background and tissue folding or precipitates.
+  - *Background subtraction*: optional morphological top-hat filtering to remove slowly-varying background (autofluorescence, uneven staining) while preserving cell-scale signal. Controlled by a radius in pixels; set to 0 to disable.
   - *Tiles fixes*:
     - *Reduce light gradients*: subdivides each local tile in kernels and tries to find and eliminate gradients of light causing shades and/directional light focuses.
     - *Homogenize bright levels*: analyzes all tiles, finding the important thresholds in the global image intensities, and tries to homogenize the histogram proportions on each tile, reducing the bright differences between them. 
@@ -423,20 +436,7 @@ There's a full [presentation](https://github.com/CellProfiling/pipex/blob/main/d
 
 
 
-Annex 3: Custom Cell Profiling lab analysis filtration
-------------------------------------------------------
-
-PIPEX's analysis step includes an optional marker filtration commonly used in Cell Profiling lab. It comprises the following (simultaneous) items:
-
- - `DAPI` 1% top ranked intensities cell removal
- - `CDH1` 1% top ranked intensities cell removal
- - `CTNNB1` 1% top ranked intensities cell removal
-
-Please make sure you the name of your marker column is a strict match with the aforementioned ones
-
-
-
-Annex 4: Cluster refinement procedure
+Annex 3: Cluster refinement procedure
 -------------------------------------
 
 PIPEX's analysis step includes the possibility to perform multiple refinements of the unsupervised clustering results (leiden and/or kmeans). This can help you with the manual annotation and merging of the clusters automatically discovered.
@@ -444,10 +444,10 @@ PIPEX's analysis step includes the possibility to perform multiple refinements o
 The idea behind the cluster refinement algorithm is to explore the ranked genes associated to each cluster and try to match them with rules stated by the user. The algorithm then assigns a confidence score per cluster and rule, depending how close its ranked genes are to the rule/s definition/s. Finally, the refinement picks per cluster the annotated cluster with higher confidence (ties are solved by row order).
 
 To use the cluster refinement, you have to create a `cell_types.csv` file with rows containing the following information:
-- `ref_id`: used as a suffix for the manually annotated cluster name. The final cluster name will be `leiden_ref[ref_id]` or `kmeans_ref[ref_id]`. Each one of the unique `ref_id` groups is a separate cluster refinement.
-- `cell_group`: used as a prefix for the manually annotated cluster name. Used in the cluster refinement JSON report file`
-- `cell_type`: used as a interfix for the manually annotated cluster name. Used in the cluster refinement JSON report file`
-- `cell_subtype`: used as a suffix for the manually annotated cluster name. Used in the cluster refinement JSON report file`
+- `ref_id`: used as a suffix for the manually annotated cluster name. The final cluster name will be `leiden_ref[ref_id]` or `kmeans_ref[ref_id]`. Each unique `ref_id` group is an independent parallel refinement — it produces its own output column and JSON report, it does not filter the results of a previous ref_id. A typical use is a first ref_id with strict rules (`high` level, higher `min_confidence`) for well-defined populations, and a second ref_id with looser rules to catch remaining ambiguous clusters.
+- `cell_group`: used as a prefix for the annotated cluster name. Used in the cluster refinement JSON report file.
+- `cell_type`: used as an interfix for the annotated cluster name. Used in the cluster refinement JSON report file.
+- `cell_subtype`: used as a suffix for the annotated cluster name. Empty values are omitted from the final name (e.g. leaving `cell_group` and `cell_type` filled but `cell_subtype` empty produces `cell_group.cell_type`).
 - `rank_filter`: used to direct the refinement procedure to use only certain ranked genes. Default is `all` (no filtering, but all rule markers must be present in the cluster class ranked genes), you can use `positive_only` (all rule markers must be present in the cluster class ranked genes and will enforce the usage of only the ones with positive values) or `none` (no filtering, rule markers may not present in the cluster class ranked genes)
 - `min_confidence`: by default, the refinement procedure aggresively merges all clusters that minimally fullfil the indicated rules. You can force the process to be more strict by using a higher `min_confidence` probability (values from 0 to 100)
 - `marker[n]` and `rule[n]` pairs: you can add an arbritary amount (at least one!) of marker rules to guide the algorithm how to annotate/merge the automatically discovered clusters. The marker value must match one of your analysis markers and the rule states how the marker should be relatively placed amongst the ranked genes (values `high`,`medium`,`low`)
@@ -466,3 +466,24 @@ Here's and example of how a `cell_types.csv` file usually looks:
     2,epithelial,ductal,unknown,all,0,KRT19,medium,PANCK,medium
 
 </code>
+
+
+Annex 4: Neighborhood cell type analysis
+-----------------------------------------
+
+When `-neigh_cluster_id` is set, PIPEX computes two complementary views of how cell types are spatially organized around each other.
+
+**Neighbor composition plots**
+
+For each k value in `-neigh_k_values` (default: 1, 5, 10), PIPEX looks at the k nearest neighbors of every cell and tallies what fraction of those neighbors belong to each cell type. This produces a cell-type × cell-type percentage matrix that answers: *"when I am next to a cell of type X, what types of cells surround it?"*
+
+The matrix is saved as two plots — a heatmap (`_neighborhood_analysis_cell_types_heatmap.jpg`) and a stacked bar chart (`_neighborhood_analysis_cell_types_stackbar.jpg`) — both showing all configured k values side by side for easy comparison.
+
+**Spatial distribution classification**
+
+PIPEX also classifies how each cell type is distributed across the tissue. It runs DBSCAN clustering on the spatial coordinates of each cell type independently, using an adaptive distance threshold derived from the global median nearest-neighbour distance. Each cell type is then labelled as:
+- **scattered sparsely**: the majority of cells fall outside any detected cluster (noise fraction > 50%).
+- **clustered sparsely**: cells form clusters but individual clusters are small relative to the total population.
+- **clustered densely**: cells form large, compact clusters (average cluster size ≥ `-neigh_density_threshold` × total cell type count).
+
+Results are saved to `{neigh_cluster_id}_spatial_distribution.csv`.

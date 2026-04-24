@@ -1,13 +1,13 @@
 import sys
 import os
+import argparse
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import datetime
-import fnmatch
-import PIL
+
 import numpy as np
 import pandas as pd
-from tifffile import TiffFile
-from xml.etree import ElementTree
+import tensorflow as tf
+from pipex_utils import iter_marker_images, log, sanitize_marker_list, validate_marker_files
 
 from stardist.models import StarDist2D
 from stardist.plot import render_label
@@ -18,11 +18,11 @@ from skimage.io import imsave, imread
 from skimage.filters import threshold_multiotsu
 from skimage.measure import regionprops
 from skimage.segmentation import watershed, mark_boundaries, expand_labels, relabel_sequential
+from skimage.feature import peak_local_max
 from skimage.transform import resize
 
 
-PIL.Image.MAX_IMAGE_PIXELS = 10000000000
-pipex_max_resolution = 30000
+pipex_max_resolution = 32768
 if "PIPEX_MAX_RESOLUTION" in os.environ:
     pipex_max_resolution = int(os.environ.get('PIPEX_MAX_RESOLUTION'))
 pipex_scale_factor = 0
@@ -63,27 +63,26 @@ def downscale_images(np_img):
             nuclei_expansion = nuclei_expansion / pipex_scale_factor
             global membrane_diameter
             membrane_diameter = membrane_diameter / pipex_scale_factor
-        return resize(np_img, (len(np_img) / pipex_scale_factor, len(np_img[0]) / pipex_scale_factor), order=0, preserve_range=True, anti_aliasing=False).astype('uint16')
+        return resize(np_img, (len(np_img) // pipex_scale_factor, len(np_img[0]) // pipex_scale_factor), order=0, preserve_range=True, anti_aliasing=False).astype('uint16')
     return np_img
 
 
 def upscale_results(df):
     if pipex_scale_factor > 0:
-        image = PIL.Image.open(os.path.join(data_folder, "analysis", "segmentation_mask.tif"))
-        image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
-        image.save(os.path.join(data_folder, "analysis", "segmentation_mask.tif"))
-
-        image = PIL.Image.open(os.path.join(data_folder, "analysis", "segmentation_binary_mask.tif"))
-        image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
-        image.save(os.path.join(data_folder, "analysis", "segmentation_binary_mask.tif"))
+        for fname in ["segmentation_mask.tif", "segmentation_binary_mask.tif"]:
+            path = os.path.join(data_folder, "analysis", fname)
+            image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+            image = cv2.resize(image, (image.shape[1] * pipex_scale_factor, image.shape[0] * pipex_scale_factor), interpolation=cv2.INTER_NEAREST)
+            cv2.imwrite(path, image)
 
         labels = np.load(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'))
         labels = labels.repeat(pipex_scale_factor, axis=0).repeat(pipex_scale_factor, axis=1)
         np.save(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'), labels)
 
-        image = PIL.Image.open(os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg"))
-        image = image.resize((image.size[0] * pipex_scale_factor, image.size[1] * pipex_scale_factor))
-        image.save(os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg"))
+        path = os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg")
+        image = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        image = cv2.resize(image, (image.shape[1] * pipex_scale_factor, image.shape[0] * pipex_scale_factor), interpolation=cv2.INTER_NEAREST)
+        cv2.imwrite(path, image)
 
         pipex_scale_factor_n2 = pow(pipex_scale_factor, 2)
         df['x'] = df['x'] * pipex_scale_factor
@@ -93,8 +92,26 @@ def upscale_results(df):
 
 def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
     if custom_segmentation == "" or custom_segmentation_type != "nuc":
-        #normalizing images
-        nuclei_img = (nuclei_img_orig - np.amin(nuclei_img_orig)) / (np.amax(nuclei_img_orig) - np.amin(nuclei_img_orig))
+        img_min = np.amin(nuclei_img_orig)
+        img_range = np.amax(nuclei_img_orig) - img_min
+        if img_range == 0:
+            print(">>> WARNING: nuclei image has uniform intensity, cannot segment", flush=True)
+            return np.zeros_like(nuclei_img_orig, dtype=np.int32), set()
+        nuclei_img = (nuclei_img_orig - img_min) / img_range
+
+        try:
+            gpus = tf.config.list_physical_devices('GPU')
+            if gpus:
+                try:
+                    for gpu in gpus:
+                        tf.config.experimental.set_memory_growth(gpu, True)
+                    print(f">>> GPU(s) detected: {len(gpus)} device(s) available", flush=True)
+                except RuntimeError as e:
+                    print(f">>> GPU configuration error: {e}", flush=True)
+            else:
+                print(">>> No GPU detected, using CPU", flush=True)
+        except ImportError:
+            print(">>> TensorFlow not configured for GPU detection", flush=True)
 
         #run stardist over nuclei image
         model = StarDist2D.from_pretrained('2D_versatile_fluo')
@@ -104,7 +121,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
             sd_labels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
         else:
             sd_labels, _ = model.predict_instances(nuclei_img,axes='YX',prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
-        print(">>> Stardist prediction done =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        log("Stardist prediction done")
 
         if nuclei_area_limit > 0:
             detections = regionprops(sd_labels)
@@ -112,18 +129,16 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                 if curr_detection.area > nuclei_area_limit:
                     sd_labels[sd_labels == curr_detection.label] = 0
 
-        im = PIL.Image.fromarray((render_label(sd_labels, img=None) * 255).astype(np.uint8))
-        im = im.convert('RGB')
-        im.save(os.path.join(data_folder, "analysis", "quality_control", "stardist_result.jpg"))
-        print(">>> Stardist base result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        imsave(os.path.join(data_folder, "analysis", "quality_control", "stardist_result.jpg"), (render_label(sd_labels, img=None) * 255).astype(np.uint8))
+        log("Stardist base result image saved")
 
         #if nuclei_expansion parameter is required, expand labelled regions (avoiding overlap) to specified size
-        if nuclei_expansion >= 0:
+        if nuclei_expansion > 0:
             sd_labels_expanded = expand_labels(sd_labels, distance=nuclei_expansion)
             imsave(os.path.join(data_folder, "analysis", "quality_control", "stardist_result_expanded.jpg"), np.uint8(mark_boundaries(nuclei_img_orig, sd_labels_expanded) * 255))
-            print(">>> Stardist expanded result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+            log("Stardist expanded result image saved")
         else:
-            sd_labels_expanded = sd_labels
+            sd_labels_expanded = sd_labels.copy()
     else:
         sd_labels_expanded = custom_img_orig
 
@@ -131,8 +146,13 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
     if membrane_diameter > 0 or custom_segmentation_type == "mem":
         if custom_segmentation == "" or custom_segmentation_type != "mem":
             #if membrane marker is provided, run custom watershed segmentation
-            #normalizing images
-            membrane_img = (membrane_img_orig - np.amin(membrane_img_orig)) / (np.amax(membrane_img_orig) - np.amin(membrane_img_orig))
+            mem_min = np.amin(membrane_img_orig)
+            mem_range = np.amax(membrane_img_orig) - mem_min
+            if mem_range == 0:
+                print(">>> WARNING: membrane image has uniform intensity, skipping membrane segmentation", flush=True)
+                membrane_img = np.zeros_like(membrane_img_orig, dtype=np.float64)
+            else:
+                membrane_img = (membrane_img_orig - mem_min) / mem_range
 
             membrane_keep_index = -1
             membrane_intensity_mean = threshold_multiotsu(membrane_img, 5)[0]
@@ -158,125 +178,74 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                     tile_y = tile_column * watershed_tile_size
                     tile_desc = str(tile_row) + "_" + str(tile_column)
                     tile_orig = membrane_img[(tile_row * watershed_tile_size):((tile_row + 1) * watershed_tile_size), (tile_column * watershed_tile_size):((tile_column + 1) * watershed_tile_size)]
-                    #run a basic watershed with segments approximatelly dimensioned by membrane_diameter and high compactness
-                    num_markers = (len(tile) / membrane_diameter) * (len(tile[0]) / membrane_diameter)
-                    ws_labels = watershed(tile * 255, markers=num_markers, compactness=membrane_compactness)
-                    print(">>> Watershed of tile ",tile_desc," done =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                    # LoG preprocessing: Gaussian smooth then Laplacian for edge-enhanced height map
+                    sigma = max(1.0, float(membrane_diameter) / 6.0)
+                    tile_f32 = tile.astype(np.float32)
+                    tile_smooth = cv2.GaussianBlur(tile_f32, (0, 0), sigma)
+                    tile_lap = cv2.Laplacian(tile_smooth, cv2.CV_32F)
+                    tile_lap_neg = np.clip(-tile_lap, 0.0, None).astype(np.float64)
+                    lap_max = tile_lap_neg.max()
+                    if lap_max > 0:
+                        tile_lap_neg /= lap_max
+                    height_map = tile_smooth.astype(np.float64) * 0.5 + tile_lap_neg * 0.5
+
+                    # Pass 1: nucleus-seeded watershed — nuclei flood outward, bright membrane acts as barrier
+                    tile_nuc_slice = sd_labels[tile_x:tile_x + len(tile), tile_y:tile_y + len(tile[0])]
+                    watershed_mask = (tile >= membrane_intensity_mean) | (tile_nuc_slice > 0)
+                    ws_labels = watershed(height_map, markers=tile_nuc_slice, mask=watershed_mask, compactness=membrane_compactness)
+                    log("Watershed of tile " + tile_desc + " done")
 
                     imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_tile_" + tile_desc + "_result.jpg"), np.uint8(mark_boundaries(tile_orig, ws_labels) * 255))
-                    print(">>> Watershed of tile ",tile_desc," result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                    log("Watershed of tile " + tile_desc + " result image saved")
 
-                    membrane_keep_intensity = 0
-                    membrane_properties = {}
-                    membrane_region_list = regionprops(ws_labels, tile_orig)
-                    num_membrane_regions = 0
-                    for curr_membrane in membrane_region_list:
-                        if curr_membrane.intensity_mean > membrane_intensity_mean and curr_membrane.area > membrane_diameter * membrane_diameter / 10:
-                            if membrane_keep == "yes":
-                                membrane_properties[curr_membrane.label] = curr_membrane.intensity_mean
-                                num_membrane_regions = num_membrane_regions + 1
-                        else:
-                            ws_labels[ws_labels == curr_membrane.label] = 0
-                    if membrane_keep == "yes" and num_membrane_regions > 0:
-                        membrane_keep_intensity = membrane_intensity_mean
+                    # Apply membrane-guided cell boundaries to sd_labels_expanded
+                    tile_exp = sd_labels_expanded[tile_x:tile_x + len(ws_labels), tile_y:tile_y + len(ws_labels[0])]
+                    affected_by_membrane.update(np.unique(ws_labels[ws_labels > 0]).tolist())
+                    tile_exp[ws_labels > 0] = ws_labels[ws_labels > 0]
+                    tile_exp[(ws_labels == 0) & (tile_nuc_slice == 0)] = 0
 
-                    #merge resulting segments so they don't cut nuclei (not expanded)
-                    ws_regions = {}
-                    for row in range(len(ws_labels)):
-                        for column in range(len(ws_labels[row])):
-                            mem_label = ws_labels[row][column]
-                            if mem_label == 0:
-                                continue
-                            if not mem_label in ws_regions:
-                                ws_regions[mem_label] = set()
-                            nuc_label = sd_labels[row + tile_x][column + tile_y]
-                            if nuc_label != 0:
-                                if not nuc_label in ws_regions[mem_label]:
-                                    ws_regions[mem_label].add(nuc_label)
-                            elif membrane_keep == 'yes' and mem_label in membrane_properties:
-                                if membrane_properties[mem_label] >= membrane_keep_intensity:
-                                    ws_regions[mem_label].add(membrane_keep_index)
-                                    membrane_keep_index = membrane_keep_index - 1
-                                del membrane_properties[mem_label]
+                    # Pass 2: detect membrane-only cells in unclaimed high-signal areas
+                    if membrane_keep == 'yes':
+                        unclaimed_mask = (ws_labels == 0) & (tile >= membrane_intensity_mean)
+                        if unclaimed_mask.any():
+                            max_coords = peak_local_max(np.where(unclaimed_mask, tile, 0.0), min_distance=max(1, int(membrane_diameter)), labels=unclaimed_mask.astype(np.int32))
+                            if len(max_coords) > 0:
+                                seed_labels = np.zeros_like(ws_labels, dtype=np.int32)
+                                for i, (r, c) in enumerate(max_coords):
+                                    seed_labels[r, c] = membrane_keep_index - i
+                                membrane_keep_index -= len(max_coords)
+                                ws_keep = watershed(height_map, markers=seed_labels, mask=unclaimed_mask, compactness=membrane_compactness)
+                                tile_exp[ws_keep != 0] = ws_keep[ws_keep != 0]
+                                log("Membrane-only watershed of tile " + tile_desc + " done")
 
-                    #merge resulting segments that contain same nuclei and/or nothing
-                    ws_regions_merged = {}
-                    for region in ws_regions:
-                        region_value = ws_regions[region]
-                        found = False
-                        for region2 in ws_regions:
-                            if ws_regions[region2] == region_value:
-                                found = True
-                                ws_regions_merged[region] = region2
-                                break
-                        if not found:
-                            ws_regions_merged[region] = region
-
-                    for row in range(len(ws_labels)):
-                        for column in range(len(ws_labels[row])):
-                            if ws_labels[row][column] == 0:
-                                continue
-                            ws_labels[row][column] = ws_regions_merged[ws_labels[row][column]]
-
-                    imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_tile_" + tile_desc +"_result_merged_by_nuclei.jpg"), np.uint8(mark_boundaries(tile_orig, ws_labels) * 255))
-                    print(">>> Watershed of tile ",tile_desc," preliminary nuclei filter result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
-
-                    #cut expanded nuclei that collide with watershed segments
-                    for row in range(len(ws_labels)):
-                        for column in range(len(ws_labels[row])):
-                            nuc_label = sd_labels[row + tile_x][column + tile_y]
-                            exp_label = sd_labels_expanded[row + tile_x][column + tile_y]
-                            if nuc_label != exp_label or exp_label == 0:
-                                mem_label = ws_labels[row][column]
-                                if mem_label == 0:
-                                    continue
-                                if len(ws_regions[mem_label]) == 0:
-                                    sd_labels_expanded[row + tile_x][column + tile_y] = 0
-                                    if exp_label > 0:
-                                        affected_by_membrane.add(exp_label)
-                                elif exp_label == 0 or not exp_label in ws_regions[mem_label]:
-                                    if membrane_keep == 'yes':
-                                        membrane_only_label = 0 + sum(number for number in ws_regions[mem_label] if number < 0)
-                                        sd_labels_expanded[row + tile_x][column + tile_y] = membrane_only_label
-                                    else:
-                                        sd_labels_expanded[row + tile_x][column + tile_y] = 0
-                                        if exp_label > 0:
-                                            affected_by_membrane.add(exp_label)
+                    imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_tile_" + tile_desc + "_result_merged_by_nuclei.jpg"), np.uint8(mark_boundaries(tile_orig, tile_exp) * 255))
+                    log("Watershed of tile " + tile_desc + " final result image saved")
 
         else:
             ws_labels = custom_img_orig
             # merge resulting segments so they don't cut nuclei (not expanded)
             ws_regions = {}
-            for row in range(len(ws_labels)):
-                for column in range(len(ws_labels[row])):
-                    mem_label = ws_labels[row][column]
-                    if mem_label == 0:
-                        continue
-                    if not mem_label in ws_regions:
-                        ws_regions[mem_label] = set()
-                    nuc_label = sd_labels[row][column]
-                    if nuc_label != 0:
-                        if not nuc_label in ws_regions[mem_label]:
-                            ws_regions[mem_label].add(nuc_label)
+            unique_mem_labels = np.unique(ws_labels)
+            unique_mem_labels = unique_mem_labels[unique_mem_labels != 0]
+            for mem_label in unique_mem_labels:
+                mask = ws_labels == mem_label
+                nuc_vals = sd_labels[mask]
+                ws_regions[mem_label] = set(nuc_vals[nuc_vals != 0].tolist())
 
             # merge resulting segments that contain same nuclei and/or nothing
-            ws_regions_merged = {}
+            value_to_first = {}
             for region in ws_regions:
-                region_value = ws_regions[region]
-                found = False
-                for region2 in ws_regions:
-                    if ws_regions[region2] == region_value:
-                        found = True
-                        ws_regions_merged[region] = region2
-                        break
-                if not found:
-                    ws_regions_merged[region] = region
+                key = frozenset(ws_regions[region])
+                if key not in value_to_first:
+                    value_to_first[key] = region
+            ws_regions_merged = {region: value_to_first[frozenset(ws_regions[region])] for region in ws_regions}
 
-            for row in range(len(ws_labels)):
-                for column in range(len(ws_labels[row])):
-                    if ws_labels[row][column] == 0:
-                        continue
-                    ws_labels[row][column] = ws_regions_merged[ws_labels[row][column]]
+            if ws_regions_merged:
+                lookup = np.arange(max(ws_regions_merged) + 1, dtype=ws_labels.dtype)
+                for label, merged in ws_regions_merged.items():
+                    lookup[label] = merged
+                nz = ws_labels != 0
+                ws_labels[nz] = lookup[ws_labels[nz]]
 
             imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_result_merged_by_nuclei.jpg"),
                    np.uint8(mark_boundaries(nuclei_img_orig, ws_labels) * 255))
@@ -284,31 +253,33 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                   datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
             # cut expanded nuclei that collide with watershed segments
-            for row in range(len(ws_labels)):
-                for column in range(len(ws_labels[row])):
-                    nuc_label = sd_labels[row][column]
-                    exp_label = sd_labels_expanded[row][column]
-                    if nuc_label != exp_label or exp_label == 0:
-                        mem_label = ws_labels[row][column]
-                        if mem_label == 0:
-                            continue
-                        if len(ws_regions[mem_label]) == 0:
-                            sd_labels_expanded[row][column] = 0
-                            if exp_label > 0:
-                                affected_by_membrane.add(exp_label)
-                        elif exp_label == 0 or not exp_label in ws_regions[mem_label]:
-                            if membrane_keep == 'yes':
-                                membrane_only_label = 0 + sum(number for number in ws_regions[mem_label] if number < 0)
-                                sd_labels_expanded[row][column] = membrane_only_label
-                            else:
-                                sd_labels_expanded[row][column] = 0
-                                if exp_label > 0:
-                                    affected_by_membrane.add(exp_label)
+            in_expansion = (sd_labels != sd_labels_expanded) | (sd_labels_expanded == 0)
+            candidates = in_expansion & (ws_labels != 0)
+            for mem_label in np.unique(ws_labels[candidates]):
+                pixel_mask = candidates & (ws_labels == mem_label)
+                region = ws_regions[mem_label]
+                exp_vals = sd_labels_expanded[pixel_mask]
+                if len(region) == 0:
+                    affected_by_membrane.update(exp_vals[exp_vals > 0].tolist())
+                    sd_labels_expanded[pixel_mask] = 0
+                else:
+                    not_in_region = np.array([e == 0 or e not in region for e in exp_vals])
+                    if not_in_region.any():
+                        if membrane_keep == 'yes':
+                            membrane_only_label = sum(n for n in region if n < 0)
+                            new_vals = exp_vals.copy()
+                            new_vals[not_in_region] = membrane_only_label
+                            sd_labels_expanded[pixel_mask] = new_vals
+                        else:
+                            affected_by_membrane.update(exp_vals[not_in_region & (exp_vals > 0)].tolist())
+                            new_vals = exp_vals.copy()
+                            new_vals[not_in_region] = 0
+                            sd_labels_expanded[pixel_mask] = new_vals
 
         top_positive_label = np.max(sd_labels_expanded)
         negative_label_mask = sd_labels_expanded < 0
+        affected_by_membrane.update(np.unique(sd_labels_expanded[negative_label_mask]).tolist())
         sd_labels_expanded[negative_label_mask] = top_positive_label - sd_labels_expanded[negative_label_mask]
-        affected_by_membrane.update(list(np.unique(sd_labels_expanded[sd_labels_expanded < 0])))
 
 
         #find rare disjointed segmented cells and using their associated convex hull instead
@@ -316,14 +287,12 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
         for segment in segment_properties:
             contours, hierarchy = cv2.findContours(segment.image.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if len(contours) > 1:
-                print(">>> Found disjointed segment " + str(segment.label) + ", using convex hull instead =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+                log("Found disjointed segment " + str(segment.label) + ", using convex hull instead")
                 bbox = segment.bbox
                 filling_image = segment.image_convex
                 if segment.solidity > 0.0:
-                    for row in range(len(filling_image)):
-                        for column in range(len(filling_image[row])):
-                           if filling_image[row][column] > 0:
-                               sd_labels_expanded[row + bbox[0]][column + bbox[1]] = segment.label
+                    rows, cols = np.where(filling_image > 0)
+                    sd_labels_expanded[rows + bbox[0], cols + bbox[1]] = segment.label
 
     del sd_labels
     if custom_segmentation != "" and custom_segmentation_type == "full":
@@ -332,24 +301,16 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
         sd_labels_expanded = relabel_sequential(sd_labels_expanded)[0]
 
     np.save(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'), sd_labels_expanded)
-    print(">>> Final joined segmentation result numpy binary data saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Final joined segmentation result numpy binary data saved")
 
     imsave(os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg"), np.uint8(mark_boundaries(nuclei_img_orig, sd_labels_expanded) * 255))
-    print(">>> Final joined segmentation result image over nuclei saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Final joined segmentation result image over nuclei saved")
 
-    bg_img = PIL.Image.new('RGB', (len(nuclei_img_orig[0]), len(nuclei_img_orig)), (0, 0, 0))
-    bg_img = PIL.Image.fromarray(np.uint8(mark_boundaries(np.array(bg_img), sd_labels_expanded, color=(0, 1, 0)) * 255))
-    bg_img = bg_img.convert("RGBA")
-    bg_data = bg_img.getdata()
-    new_data = []
-    for item in bg_data:
-        if item[0] == 0 and item[1] == 0 and item[2] == 0:
-            new_data.append((0, 0, 0, 0))
-        else:
-            new_data.append(item)
-    bg_img.putdata(new_data)
-    imsave(os.path.join(data_folder, "analysis", "segmentation_boundaries.png"), np.array(bg_img))
-    print(">>> Final segmentation boundaries overlay saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    black_canvas = np.zeros((len(nuclei_img_orig), len(nuclei_img_orig[0]), 3), dtype=np.uint8)
+    boundaries_rgb = np.uint8(mark_boundaries(black_canvas, sd_labels_expanded, color=(0, 1, 0)) * 255)
+    boundaries_rgba = np.dstack([boundaries_rgb, np.where(boundaries_rgb.any(axis=2), 255, 0).astype(np.uint8)])
+    imsave(os.path.join(data_folder, "analysis", "segmentation_boundaries.png"), boundaries_rgba)
+    log("Final segmentation boundaries overlay saved")
 
     sdLabels_expanded_binary = np.copy(sd_labels_expanded)
     sdLabels_expanded_binary[sdLabels_expanded_binary > 0] = 1
@@ -357,12 +318,12 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
     del sdLabels_expanded_binary
 
     if np.amax(sd_labels_expanded) <= 255:
-        imsave(os.path.join(data_folder, "analysis", "segmentation_mask.tif"), np.uint8(sd_labels_expanded * 255))
+        imsave(os.path.join(data_folder, "analysis", "segmentation_mask.tif"), sd_labels_expanded.astype(np.uint8))
     elif np.amax(sd_labels_expanded) <= 65535:
-        imsave(os.path.join(data_folder, "analysis", "segmentation_mask.tif"), np.uint16(sd_labels_expanded * 65535))
+        imsave(os.path.join(data_folder, "analysis", "segmentation_mask.tif"), sd_labels_expanded.astype(np.uint16))
     else:
-        imsave(os.path.join(data_folder, "analysis", "segmentation_mask.tif"), np.uint32(sd_labels_expanded * 4294967296))
-    print(">>> Final joined segmentation result image saved =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+        imsave(os.path.join(data_folder, "analysis", "segmentation_mask.tif"), sd_labels_expanded.astype(np.uint32))
+    log("Final joined segmentation result image saved")
 
     return sd_labels_expanded, affected_by_membrane
 
@@ -370,12 +331,14 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
 #Function to calculate the marker intensities for each cell
 def marker_calculation(marker, marker_img, cellLabels, data_table):
     #applying segmentation mask over the marker image
-    marker_img_min = np.amin(marker_img)
-    marker_img_max = np.amax(marker_img)
-    marker_img_norm = (marker_img - marker_img_min) / (marker_img_max - marker_img_min)
+    marker_img_min, marker_img_max = np.percentile(marker_img, (1, 99.5))
+    marker_img_range = marker_img_max - marker_img_min
+    if marker_img_range == 0:
+        marker_img_range = 1
+    marker_img_norm = np.clip((marker_img - marker_img_min) / marker_img_range, 0.0, 1.0)
     c_otsu = threshold_multiotsu(marker_img_norm, 3)
     cell_binarized_threshold = c_otsu[0]
-    print(">>> Marker " + marker + " binarize threshold " + str(cell_binarized_threshold) + " =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Marker " + marker + " binarize threshold " + str(cell_binarized_threshold))
     marker_properties = regionprops(cellLabels, marker_img)
     #obtaining mean intensity per cell
     for cell in marker_properties:
@@ -383,138 +346,99 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
         cell_image = cell.image_intensity
         cell_image = cell_image[(cell_image != 0) & (~np.isnan(cell_image))]
         data_table[cell.label][marker + '_local_90'] = np.quantile(cell_image, 0.9) if len(cell_image) > 0 else 0
-        cell_image_norm = ((cell_image - marker_img_min) / (marker_img_max - marker_img_min))
+        cell_image_norm = np.maximum((cell_image - marker_img_min) / marker_img_range, 0.0)
         data_table[cell.label][marker + '_ratio_pixels'] = np.count_nonzero(cell_image_norm >= cell_binarized_threshold) / cell.area
-        data_table[cell.label][marker + '_otsu3'] = ((cell.intensity_mean - marker_img_min) / (marker_img_max - marker_img_min)) - cell_binarized_threshold
+        data_table[cell.label][marker + '_otsu3'] = np.maximum((cell.intensity_mean - marker_img_min) / marker_img_range, 0.0) - cell_binarized_threshold
 
-    print(">>> Marker " + marker + " calculated =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Marker " + marker + " calculated")
 
 
 #Function to handle the command line parameters passed
 def options(argv):
-    if len(argv) == 0:
-       print('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-custom_segmentation=<optional, file path to a pre-made custom segmentation> : example -> -custom_segmentation=/data/custom_seg.npy\n\t-custom_segmentation_type=<optional, full | nuc | mem value to indicate the type of the custom segmentation attached> : example -> -custom_segmentation_type=full\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
-       sys.exit()
-    else:
-        for arg in argv:
-            if arg.startswith('-help'):
-                print ('segmentation.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-nuclei_marker=<name before . in image file> : example, from image filename "reg001_cyc001_ch001_DAPI1.tif"-> -nuclei_marker=DAPI1\n\t-nuclei_diameter=<number of pixels> : example -> -nuclei_diameter=20\n\t-nuclei_expansion=<number of pixels, can be 0> : example -> -nuclei_expansion=20\n\t-nuclei_definition=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_definition=0.1\n\t-nuclei_closeness=<optional, gradation between 0.001 and 0.999> : example -> -nuclei_closeness=0.6\n\t-nuclei_area_limit=<optional, number of pixels> : example -> -nuclei_area_limit=3200\n\t-membrane_marker=<optional, name before . in image file> : example, from image filename "reg001_cyc008_ch003_CDH1.tif" -> -membrane_marker=CDH1\n\t-membrane_diameter=<optional, number of pixels> : example -> -membrane_diameter=25\n\t-membrane_compactness=<optional, \"squareness\" of the membrane, gradation between 0.001 and 0.999> : example -> -membrane_compactness=0.5\n\t-membrane_keep=<yes or no to keep segmented membranes without nuclei> : example -> -membrane_keep=no\n\t-custom_segmentation=<optional, file path to a pre-made custom segmentation> : example -> -custom_segmentation=/data/custom_seg.npy\n\t-custom_segmentation_type=<optional, full | nuc | mem value to indicate the type of the custom segmentation attached> : example -> -custom_segmentation_type=full\n\t-measure_markers=<list of markers names before . in image files> : example -> measure_markers=AMY2A,SST,GORASP2', flush=True)
-                sys.exit()
-            elif arg.startswith('-data='):
-                global data_folder
-                data_folder = arg[6:]
-            elif arg.startswith('-nuclei_marker='):
-                global nuclei_marker
-                nuclei_marker = arg[15:]
-            elif arg.startswith('-nuclei_diameter='):
-                global nuclei_diameter
-                nuclei_diameter = int(arg[17:])
-            elif arg.startswith('-nuclei_expansion='):
-                global nuclei_expansion
-                nuclei_expansion = int(arg[18:])
-            elif arg.startswith('-nuclei_definition='):
-                global nuclei_definition
-                nuclei_definition = float(arg[19:])
-            elif arg.startswith('-nuclei_closeness='):
-                global nuclei_closeness
-                nuclei_closeness = float(arg[18:])
-            elif arg.startswith('-nuclei_area_limit='):
-                global nuclei_area_limit
-                nuclei_area_limit = float(arg[19:])
-            elif arg.startswith('-membrane_marker='):
-                global membrane_marker
-                membrane_marker = arg[17:]
-            elif arg.startswith('-membrane_diameter='):
-                global membrane_diameter
-                membrane_diameter = int(arg[19:])
-            elif arg.startswith('-membrane_compactness='):
-                global membrane_compactness
-                membrane_compactness = float(arg[22:])
-            elif arg.startswith('-membrane_keep='):
-                global membrane_keep
-                membrane_keep = arg[15:]
-            elif arg.startswith('-custom_segmentation='):
-                global custom_segmentation
-                custom_segmentation = arg[21:]
-            elif arg.startswith('-custom_segmentation_type='):
-                global custom_segmentation_type
-                custom_segmentation_type = arg[26:]
-            elif arg.startswith('-measure_markers='):
-                global measure_markers
-                measure_markers = [x.strip() for x in arg[17:].split(",")]
-
+    converted = ['--' + a[1:] if a.startswith('-') and not a.startswith('--') else a for a in argv]
+    parser = argparse.ArgumentParser(prog='segmentation.py')
+    parser.add_argument('--data', default=os.environ.get('PIPEX_DATA'),
+        help='path to images folder : example -> -data=/lab/projectX/images')
+    parser.add_argument('--nuclei_marker', default='',
+        help='name before . in image file : example -> -nuclei_marker=DAPI1')
+    parser.add_argument('--nuclei_diameter', type=int, default=0,
+        help='number of pixels : example -> -nuclei_diameter=20')
+    parser.add_argument('--nuclei_expansion', type=int, default=0,
+        help='number of pixels, can be 0 : example -> -nuclei_expansion=20')
+    parser.add_argument('--nuclei_definition', type=float, default=0,
+        help='gradation between 0.001 and 0.999 : example -> -nuclei_definition=0.1')
+    parser.add_argument('--nuclei_closeness', type=float, default=0,
+        help='gradation between 0.001 and 0.999 : example -> -nuclei_closeness=0.6')
+    parser.add_argument('--nuclei_area_limit', type=float, default=0,
+        help='number of pixels : example -> -nuclei_area_limit=3200')
+    parser.add_argument('--membrane_marker', default='',
+        help='name before . in image file : example -> -membrane_marker=CDH1')
+    parser.add_argument('--membrane_diameter', type=int, default=0,
+        help='number of pixels : example -> -membrane_diameter=25')
+    parser.add_argument('--membrane_compactness', type=float, default=0.9,
+        help='"squareness" of the membrane, gradation between 0.001 and 0.999 : example -> -membrane_compactness=0.5')
+    parser.add_argument('--membrane_keep', choices=['yes', 'no'], default='no',
+        help='keep segmented membranes without nuclei : example -> -membrane_keep=no')
+    parser.add_argument('--custom_segmentation', default='',
+        help='file path to a pre-made custom segmentation : example -> -custom_segmentation=/data/custom_seg.npy')
+    parser.add_argument('--custom_segmentation_type', choices=['full', 'nuc', 'mem'], default='full',
+        help='type of the custom segmentation : example -> -custom_segmentation_type=full')
+    parser.add_argument('--measure_markers', type=lambda s: [x.strip() for x in s.split(',')], default=[],
+        help='list of marker names to measure : example -> -measure_markers=AMY2A,SST,GORASP2')
+    if not argv:
+        parser.print_help()
+        sys.exit()
+    return parser.parse_args(converted)
 
 if __name__ =='__main__':
-    options(sys.argv[1:])
+    args = options(sys.argv[1:])
+    data_folder = args.data
+    nuclei_marker = args.nuclei_marker
+    nuclei_diameter = args.nuclei_diameter
+    nuclei_expansion = args.nuclei_expansion
+    nuclei_definition = args.nuclei_definition
+    nuclei_closeness = args.nuclei_closeness
+    nuclei_area_limit = args.nuclei_area_limit
+    membrane_marker = args.membrane_marker
+    membrane_diameter = args.membrane_diameter
+    membrane_compactness = args.membrane_compactness
+    membrane_keep = args.membrane_keep
+    custom_segmentation = args.custom_segmentation
+    custom_segmentation_type = args.custom_segmentation_type
+    measure_markers = sanitize_marker_list(args.measure_markers)
 
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
-        f.close()
     with open(os.path.join(data_folder, 'log_settings_segmentation.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time segmentation = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
-        f.close()
 
-    print(">>> Start time segmentation =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Start time segmentation")
 
-    try:
-        os.mkdir(os.path.join(data_folder, 'analysis'))
-    except OSError as error:
-        print('>>> analysis folder already exists, overwriting results', flush=True)
-    try:
-        os.mkdir(os.path.join(data_folder, 'analysis', 'quality_control'))
-    except OSError as error:
-        print('>>> quality_control folder already exists, overwriting results', flush=True)
+    if measure_markers:
+        validate_marker_files(data_folder, measure_markers)
+
+    os.makedirs(os.path.join(data_folder, 'analysis', 'quality_control'), exist_ok=True)
 
     #finding nuclei and membrane image filenames by marker name
     nuclei_img = None
     membrane_img = None
     custom_img = None
     if custom_segmentation == "" or custom_segmentation_type != "full":
-        for file in os.listdir(data_folder):
-            file_path = os.path.join(data_folder, file)
-            if os.path.isdir(file_path):
-                continue
+        loaded = {}
+        def collect_images(marker, raw_img):
+            if marker == nuclei_marker:
+                loaded['nuclei'] = downscale_images(raw_img)
+            elif marker == membrane_marker:
+                loaded['membrane'] = downscale_images(raw_img)
 
-            next_try = False
-            try:
-                with TiffFile(file_path) as tif:
-                    if len(tif.series[0].pages) == 1:
-                        if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                            nuclei_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
-                        if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                            membrane_img = downscale_images(next(iter(tif.series[0].pages)).asarray())
-                    else:
-                        #Akoya's qptiff
-                        for page in tif.series[0].pages:
-                            biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
-                            if biomarker == nuclei_marker:
-                                nuclei_img = downscale_images(page.asarray())
-                            if biomarker == membrane_marker:
-                                membrane_img = downscale_images(page.asarray())
-            except Exception as e:
-                print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
-                print('>>> ', e, flush=True)
-                next_try = True
-
-            if next_try:
-                try:
-                    if fnmatch.fnmatch(file, '*' + nuclei_marker + '.*'):
-                        curr_image = np.array(PIL.Image.open(file_path))
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        nuclei_img = downscale_images(curr_image)
-                    if membrane_marker != "" and fnmatch.fnmatch(file, '*' + membrane_marker + '.*'):
-                        curr_image = np.array(PIL.Image.open(file_path))
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        membrane_img = downscale_images(curr_image)
-                except Exception as e:
-                    print('>>> Could not read image ' + file_path, flush=True)
-                    print('>>> ', e, flush=True)
+        markers_to_load = [m for m in [nuclei_marker, membrane_marker] if m]
+        iter_marker_images(data_folder, markers_to_load, collect_images)
+        nuclei_img = loaded.get('nuclei')
+        membrane_img = loaded.get('membrane')
     else:
         try_image = False
         try:
@@ -524,12 +448,21 @@ if __name__ =='__main__':
             print('>>> ', e, flush=True)
         if try_image:
             try:
-                custom_img = downscale_images(np.array(PIL.Image.open(os.path.join(data_folder, custom_segmentation))))
+                custom_img = downscale_images(cv2.imread(os.path.join(data_folder, custom_segmentation), cv2.IMREAD_UNCHANGED))
             except Exception as e:
                 print('>>> Could not custom segmentation file ' + custom_segmentation, flush=True)
                 print('>>> ', e, flush=True)
 
     #performing segmentation
+    if custom_segmentation == "" or custom_segmentation_type != "full":
+        if nuclei_img is None:
+            print(">>> ERROR: nuclei marker '" + nuclei_marker + "' not found in data folder, cannot segment", flush=True)
+            sys.exit(1)
+        if membrane_marker != "" and membrane_img is None:
+            print(">>> WARNING: membrane marker '" + membrane_marker + "' not found in data folder, continuing without membrane refinement", flush=True)
+    elif custom_img is None:
+        print(">>> ERROR: custom segmentation file '" + custom_segmentation + "' could not be loaded, cannot segment", flush=True)
+        sys.exit(1)
     cellLabels, membraneAffected = cell_segmentation(nuclei_img, membrane_img, custom_img)
 
     del nuclei_img
@@ -550,42 +483,10 @@ if __name__ =='__main__':
         data_table[cell.label] = data_cell
 
     #calculating marker intensities per cell
-    for file in os.listdir(data_folder):
-        file_path = os.path.join(data_folder, file)
-        if os.path.isdir(file_path):
-            continue
+    def handle_marker(marker, raw_img):
+        marker_calculation(marker, downscale_images(raw_img), cellLabels, data_table)
 
-        next_try = False
-        try:
-            with TiffFile(file_path) as tif:
-                if len(tif.series[0].pages) == 1:
-                    for marker in measure_markers:
-                        if marker + '.' in file:
-                            marker_calculation(marker, downscale_images(next(iter(tif.series[0].pages)).asarray()), cellLabels, data_table)
-                            break
-                else:
-                    #Akoya's qptiff
-                    for page in tif.series[0].pages:
-                        biomarker = ElementTree.fromstring(page.description).find('Biomarker').text
-                        if biomarker in measure_markers:
-                            marker_calculation(biomarker, downscale_images(page.asarray()), cellLabels, data_table)
-        except Exception as e:
-            print('>>> checking type of ' + file_path + ', not QPTIFF', flush=True)
-            print('>>> ', e, flush=True)
-            next_try = True
-
-        if next_try:
-            try:
-                for marker in measure_markers:
-                    if marker + '.' in file:
-                        curr_image = np.array(PIL.Image.open(file_path))
-                        if len(curr_image.shape) > 2:
-                            curr_image = curr_image[:, :, 0]
-                        marker_calculation(marker, downscale_images(curr_image), cellLabels, data_table)
-                        break
-            except Exception as e:
-                print('>>> Could not read image ' + file_path, flush=True)
-                print('>>> ', e, flush=True)
+    iter_marker_images(data_folder, measure_markers, handle_marker)
 
 
     #dumpming data_table in cell_data.csv file
@@ -607,4 +508,4 @@ if __name__ =='__main__':
     df = df.reindex(measure_markers, axis=1)
     df.to_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'), index=False)
 
-    print(">>> End time segmentation =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("End time segmentation")

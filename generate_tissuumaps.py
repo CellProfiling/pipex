@@ -1,17 +1,29 @@
 import scanpy as sc
 import scipy
 import os
+import fnmatch
 import json
+import copy
 import datetime
 import sys
+import argparse
 from skimage.measure import approximate_polygon
 import numpy as np
+from pipex_utils import log
 
 data_folder = os.environ.get('PIPEX_DATA')
 include_marker_images = "no"
 include_geojson = "no"
 compress_geojson = "no"
 include_html = "no"
+
+def find_marker_file(folder, marker):
+    """Return the filename of the first image in folder whose name ends with marker."""
+    for fname in sorted(os.listdir(folder)):
+        if not os.path.isdir(os.path.join(folder, fname)) and fnmatch.fnmatch(fname, f'*{marker}.*'):
+            return fname
+    return None
+
 
 def exporting_tissuumaps ():
     # Check if the required files are present
@@ -25,6 +37,7 @@ def exporting_tissuumaps ():
             include_geojson = "no"
     
     adata = sc.read_h5ad(os.path.join(data_folder, 'analysis/downstream/anndata.h5ad'))
+    log("AnnData loaded")
 
     # Make sure that the X matrix is in the compressed sparse column (CSC) format (required by TissUUmaps)
     adata.X = scipy.sparse.csc_matrix(adata.X)
@@ -39,35 +52,30 @@ def exporting_tissuumaps ():
     if include_geojson == "yes" and include_marker_images != "no":
         if compress_geojson == "yes":
             import geobuf
-            # load os.path.join(data_folder, 'analysis/cell_segmentation_geo.json') as json
-            with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.json'), 'r') as f:
-                geojson_data = json.load(f)
-                # Remove measurements from geojson_data[i].properties.measurements
-                for f in geojson_data:
-                    if "measurements" in f["properties"]:
-                        del f["properties"]["measurements"]
-                # Approximate region boundaries to reduce file size:
+            with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.json'), 'r') as geojson_file:
+                geojson_data = json.load(geojson_file)
+                for feature in geojson_data:
+                    if "measurements" in feature["properties"]:
+                        del feature["properties"]["measurements"]
                 geojson_data_approx = []
-                for f in geojson_data:
-                    f_approx = f.copy()
-                    for i in range(len(f["geometry"]["coordinates"])):
-                            f_approx["geometry"]["coordinates"][i] = approximate_polygon(np.array(f["geometry"]["coordinates"][i]), tolerance=0.75).tolist()
-                    geojson_data_approx.append(f_approx)
+                for feature in geojson_data:
+                    feature_approx = copy.deepcopy(feature)
+                    for i in range(len(feature["geometry"]["coordinates"])):
+                        feature_approx["geometry"]["coordinates"][i] = approximate_polygon(np.array(feature["geometry"]["coordinates"][i]), tolerance=0.75).tolist()
+                    geojson_data_approx.append(feature_approx)
                 geojson_data_approx = {
                     "type":"FeatureCollection",
                     "features":geojson_data_approx
                 }
-                # Save as a compressed protobuf file in the geobuf format:
-                pbf = geobuf.encode(geojson_data_approx, 3) # TissUUmaps uses a precision of 3 decimal
-                # We need to add a tag to indicate the precision
+                pbf = geobuf.encode(geojson_data_approx, 3)
                 data = geobuf.geobuf_pb2.Data()
                 data.ParseFromString(pbf)
                 data.precision = 3
                 pbf = data.SerializeToString()
-
                 cell_segmentation_path = "../cell_segmentation_geo.pbf"
                 with open(os.path.join(data_folder, 'analysis', 'cell_segmentation_geo.pbf'), 'wb') as f:
                     f.write(pbf)
+            log("GeoJSON compressed to pbf")
         else:
             cell_segmentation_path = "../cell_segmentation_geo.json"
         regionFiles = [
@@ -96,14 +104,16 @@ def exporting_tissuumaps ():
         ]
     else:
         regionFiles = []
+    layers = []
+    for marker in markers:
+        fname = find_marker_file(data_folder, marker)
+        if fname is None:
+            print(f">>> Warning: no image found for marker {marker}, skipping layer", flush=True)
+            continue
+        layers.append({"name": marker, "tileSource": f"../../{fname}.dzi"})
+
     adata.uns["tmap"] = json.dumps({
-        "layers": [
-            {
-                "name": f"{marker}",
-                "tileSource": f"../../{marker}.tif.dzi"
-            }
-            for marker in markers
-        ],
+        "layers": layers,
         "regionFiles": regionFiles,
         "plugins": ["Feature_Space","InteractionQC","Spot_Inspector"],
         "settings": [
@@ -129,6 +139,7 @@ def exporting_tissuumaps ():
         ],
     })
     adata.write_h5ad(os.path.join(data_folder, 'analysis', 'downstream', 'anndata_TissUUmaps.h5ad'))
+    log("AnnData TissUUmaps file saved")
 
     if include_html == "yes":
         import tissuumaps
@@ -139,55 +150,53 @@ def exporting_tissuumaps ():
             os.path.join(data_folder, 'analysis', 'downstream', 'TissUUmaps_webexport'),
             os.path.join(data_folder, 'analysis', 'downstream')
         )
+        log("HTML static export saved")
         from urllib.request import urlretrieve
         for plugin in ["Feature_Space","InteractionQC","Spot_Inspector"]:
             url = f"https://tissuumaps.github.io/TissUUmaps/plugins/latest/{plugin}.js"
             filename = os.path.join(data_folder, 'analysis', 'downstream', 'TissUUmaps_webexport', 'plugins', f"{plugin}.js")
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             urlretrieve(url, filename)
+        log("TissUUmaps plugins downloaded")
 
 #Function to handle the command line parameters passed
 def options(argv):
-    if (len(argv) == 0):
-        print('export_tissuumaps.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-include_marker_images=<yes or no or list of present specific markers to display as image layers> : example -> -include_marker_images=DAPI,SST,GORASP2\n\t-include_geojson=<yes or no to include cell segmentation as regions> : example -> -include_geojson=yes\n\t-compress_geojson=<yes or no to compress geojson regions into pbf> : example -> -compress_geojson=yes\n\t-include_html=<yes or no to export html page for sharing the TissUUmaps project on the web> : example -> -include_marker_images=yes', flush=True)
+    converted = ['--' + a[1:] if a.startswith('-') and not a.startswith('--') else a for a in argv]
+    parser = argparse.ArgumentParser(prog='generate_tissuumaps.py')
+    parser.add_argument('--data', default=os.environ.get('PIPEX_DATA'),
+        help='path to images folder : example -> -data=/lab/projectX/images')
+    parser.add_argument('--include_marker_images', default='no',
+        help='yes/no or comma-separated marker list for image layers : example -> -include_marker_images=DAPI,SST,GORASP2')
+    parser.add_argument('--include_geojson', choices=['yes', 'no'], default='no',
+        help='include cell segmentation as regions : example -> -include_geojson=yes')
+    parser.add_argument('--compress_geojson', choices=['yes', 'no'], default='no',
+        help='compress geojson regions into pbf : example -> -compress_geojson=yes')
+    parser.add_argument('--include_html', choices=['yes', 'no'], default='no',
+        help='export html page for web sharing : example -> -include_html=yes')
+    if not argv:
+        parser.print_help()
         sys.exit()
-    else:
-        for arg in argv:
-            if arg.startswith('-help'):
-                print('export_tissuumaps.py arguments:\n\t-data=<optional /path/to/images/folder, defaults to /home/pipex/data> : example -> -data=/lab/projectX/images\n\t-include_marker_images=<yes or no or list of present specific markers to display as image layers> : example -> -include_marker_images=DAPI,SST,GORASP2\n\t-include_geojson=<yes or no to include cell segmentation as regions> : example -> -include_geojson=yes\n\t-compress_geojson=<yes or no to compress geojson regions into pbf> : example -> -compress_geojson=yes\n\t-include_html=<yes or no to export html page for sharing the TissUUmaps project on the web> : example -> -include_marker_images=yes', flush=True)
-                sys.exit()
-            elif arg.startswith('-data='):
-                global data_folder
-                data_folder = arg[6:]
-            elif arg.startswith('-include_marker_images='):
-                global include_marker_images
-                include_marker_images = arg[23:]
-            elif arg.startswith('-include_geojson='):
-                global include_geojson
-                include_geojson = arg[17:]
-            elif arg.startswith('-compress_geojson='):
-                global compress_geojson
-                compress_geojson = arg[18:]
-            elif arg.startswith('-include_html='):
-                global include_html
-                include_html = arg[14:]
+    return parser.parse_args(converted)
 
 if __name__ =='__main__':
-    options(sys.argv[1:])
+    args = options(sys.argv[1:])
+    data_folder = args.data
+    include_marker_images = args.include_marker_images
+    include_geojson = args.include_geojson
+    compress_geojson = args.compress_geojson
+    include_html = args.include_html
 
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
         pidfile_filename = './work/RUNNING'
     with open(pidfile_filename, 'w', encoding='utf-8') as f:
         f.write(str(os.getpid()))
-        f.close()
     with open(os.path.join(data_folder, 'log_settings_tissuumaps.txt'), 'w+', encoding='utf-8') as f:
         f.write(">>> Start time tissuumaps = " + datetime.datetime.now().strftime(" %H:%M:%S_%d/%m/%Y") + "\n")
         f.write(' '.join(sys.argv))
-        f.close()
 
-    print(">>> Start time exporting tissuumaps =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("Start time exporting tissuumaps")
 
     exporting_tissuumaps()
 
-    print(">>> End time exporting tissuumaps =", datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
+    log("End time exporting tissuumaps")
