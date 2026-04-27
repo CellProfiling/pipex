@@ -23,6 +23,8 @@ Key features
 
 
 
+
+
 Why PIPEX
 ---------
 
@@ -519,3 +521,67 @@ PIPEX also classifies how each cell type is distributed across the tissue. It ru
 - **clustered densely**: cells form large, compact clusters (average cluster size ≥ `-neigh_density_threshold` × total cell type count).
 
 Results are saved to `{neigh_cluster_id}_spatial_distribution.csv`.
+
+
+
+Annex 6: Extra scripts
+----------------------
+
+The `extra/` folder contains standalone Python scripts that are not part of the core PIPEX pipeline but can be useful for specific post-processing or analysis scenarios. They work entirely from `cell_data.csv` files — no images required — and are designed to be simple enough to read, understand and adapt to your own needs.
+
+To run any of them, just activate your PIPEX virtual environment, edit the configuration variables at the top of the script, and run it with `python`.
+
+
+### custom_binarization_example.py
+
+**What it does**: applies a marker +/- binarization to `cell_data.csv` using the continuous scores already computed by the PIPEX segmentation step (`_gmm_prob`, `_triangle_score`, `_otsu3`). For each detected marker a new column `{marker}_custom_binarization` is added with values `{marker}+` or `{marker}-`.
+
+**When is it useful**: PIPEX's built-in binarization (controlled by `-use_bin`) is applied at analysis time and is coupled to the clustering pipeline. This script lets you re-run or adjust the binarization logic independently, after the fact, without re-running the full pipeline — useful when you want to tune thresholds for a specific marker, try a different scoring method, or produce binarization columns for downstream tools that expect explicit +/- labels.
+
+**How to use**:
+1. Edit `CELL_DATA_PATH` to point to your `cell_data.csv`.
+2. Optionally adjust `GMM_PROB_THRESHOLD` (default `0.5`) and the overcall protection parameters.
+3. Run the script — it overwrites `cell_data.csv` in place with the new columns appended.
+
+```
+python extra/custom_binarization_example.py
+```
+
+The script auto-detects all markers that have at least one recognised score column in the CSV. The binarization cascade tries `_gmm_prob` first, falls back to `_triangle_score`, and finally to `_otsu3` — the same logic used internally by PIPEX.
+
+An overcall protection mechanism is included: if on a re-run the positive fraction increases more than 5× relative to the previous labels *and* exceeds 15% of all cells, the existing labels are kept and a warning is printed.
+
+
+### match_segmentation_ids.py
+
+**What it does**: given two `cell_data.csv` files from different PIPEX segmentation runs on the same image, it matches cells between them based on their spatial (x, y) centroid positions and writes a `matched_cell_id` column into the target file, right after `cell_id`. Cells with no match within the configured distance are assigned `matched_cell_id = 0`.
+
+**When is it useful**: a common workflow is to run PIPEX twice on the same image — once with whole-cell segmentation (nuclei + membrane marker) to capture cytoplasmic markers, and once with nuclear-only segmentation to capture nuclear markers like Ki67, CDK1 or phospho-proteins. This script bridges the two runs so you can merge nuclear scores back into your whole-cell table (or vice versa) by joining on `matched_cell_id = cell_id`.
+
+**How to use**:
+1. Edit `SOURCE_FILE` and `TARGET_FILE` to point to the two `cell_data.csv` files.
+2. Adjust `MINIMUM_DISTANCE_ALLOWED` if needed (default `10` pixels, which typically matches ~99% of cells for standard CODEX resolutions).
+3. Run the script — it overwrites the target file in place.
+
+```
+python extra/match_segmentation_ids.py
+```
+
+The script uses a KD-tree for fast nearest-neighbour lookup and is efficient even for large images with hundreds of thousands of cells. The match statistics (percentage of cells matched) are printed at the end — if the rate is low, try increasing `MINIMUM_DISTANCE_ALLOWED` slightly; if you see unexpected cross-matches, decrease it.
+
+After running the script you can join the two tables in any data analysis tool (Python/pandas, R, etc.):
+
+```python
+import pandas as pd
+
+whole_cell = pd.read_csv("cell_data.csv")
+nuclear    = pd.read_csv("cell_data_nuclear.csv")
+
+# nuclear.matched_cell_id links to whole_cell.cell_id
+merged = nuclear[nuclear.matched_cell_id != 0].merge(
+    whole_cell,
+    left_on="matched_cell_id",
+    right_on="cell_id",
+    suffixes=("_nuc", "_wc")
+)
+```
