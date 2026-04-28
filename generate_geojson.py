@@ -106,7 +106,7 @@ if __name__ =='__main__':
         for marker in markers:
             cell_data["properties"]["measurements"].append({
                 "name" : marker,
-                "value" : float(cell[marker])
+                "value" : float(cell[marker]) if pd.notna(cell[marker]) else 0.0
                 })
 
         #if cluster_id parameter is selected, add cluster_id and cluster_color

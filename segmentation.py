@@ -2,6 +2,8 @@ import sys
 import os
 import argparse
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_USE_LEGACY_KERAS'] = '1'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 import datetime
 
 import numpy as np
@@ -120,7 +122,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
         sd_labels = None
         #for big images (>stardist_tile_threshold), run predict_instances_big method using 2048 square tiles
         if max(len(nuclei_img), len(nuclei_img[0])) > stardist_tile_threshold:
-            sd_labels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=2048,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
+            sd_labels, _ = model.predict_instances_big(nuclei_img,axes='YX',block_size=1024,min_overlap=128,prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
         else:
             sd_labels, _ = model.predict_instances(nuclei_img,axes='YX',prob_thresh=(nuclei_definition if nuclei_definition > 0 else None), nms_thresh=(nuclei_closeness if nuclei_closeness > 0 else None))
         log("Stardist prediction done")
@@ -131,7 +133,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                 if curr_detection.area > nuclei_area_limit:
                     sd_labels[sd_labels == curr_detection.label] = 0
 
-        imsave(os.path.join(data_folder, "analysis", "quality_control", "stardist_result.jpg"), (render_label(sd_labels, img=None) * 255).astype(np.uint8))
+        imsave(os.path.join(data_folder, "analysis", "quality_control", "stardist_result.jpg"), (render_label(sd_labels, img=None)[..., :3] * 255).astype(np.uint8))
         log("Stardist base result image saved")
 
         #if nuclei_expansion parameter is required, expand labelled regions (avoiding overlap) to specified size
@@ -338,8 +340,12 @@ def marker_calculation(marker, marker_img, cellLabels, data_table):
     if marker_img_range == 0:
         marker_img_range = 1
     marker_img_norm = np.clip((marker_img - marker_img_min) / marker_img_range, 0.0, 1.0)
-    c_otsu = threshold_multiotsu(marker_img_norm, 3)
-    cell_binarized_threshold = c_otsu[0]
+    try:
+        c_otsu = threshold_multiotsu(marker_img_norm, 3)
+        cell_binarized_threshold = c_otsu[0]
+    except Exception:
+        cell_binarized_threshold = float(np.mean(marker_img_norm))
+        print(f">>> WARNING: threshold_multiotsu failed for {marker}, using mean {cell_binarized_threshold:.4f} as fallback", flush=True)
     log("Marker " + marker + " binarize threshold " + str(cell_binarized_threshold))
 
     try:
@@ -541,7 +547,7 @@ if __name__ =='__main__':
     measure_markers.insert(0, 'x')
     measure_markers.insert(0, 'size')
     measure_markers.insert(0, 'cell_id')
-    df = df.reindex(measure_markers, axis=1)
+    df = df.reindex(measure_markers, axis=1).fillna(0)
     df.to_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'), index=False)
 
     log("End time segmentation")

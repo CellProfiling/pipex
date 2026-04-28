@@ -332,13 +332,13 @@ def calculate_cluster_info(adata, cluster_type, markers):
         sq.pl.nhood_enrichment(adata, cluster_key=cluster_type, method="single", show=False,
                                save='nhood_enrichment_' + cluster_type + '.jpg')
     except Exception as e:
-        log('Neighborhood calculations failed for cluster ' + cluster_type)
+        log('Neighborhood calculations failed for cluster ' + cluster_type + ': ' + str(e))
 
     try:
         sq.gr.interaction_matrix(adata, cluster_key=cluster_type)
         sq.pl.interaction_matrix(adata, cluster_key=cluster_type, show=False, save='interaction_matrix_' + cluster_type + '.jpg')
     except Exception as e:
-        log('Interaction matrix analysis failed for cluster ' + cluster_type)
+        log('Interaction matrix analysis failed for cluster ' + cluster_type + ': ' + str(e))
 
     try:
         sc.tl.rank_genes_groups(adata, cluster_type, method='t-test')
@@ -348,6 +348,19 @@ def calculate_cluster_info(adata, cluster_type, markers):
 
     sc.pl.heatmap(adata, markers, groupby=cluster_type, swap_axes=True, cmap='viridis', dendrogram=False, show=False,
                   save='_' + cluster_type)
+
+
+def _sort_json_keys(obj):
+    if isinstance(obj, dict):
+        def _key(k):
+            try:
+                return (0, int(k), '')
+            except (ValueError, TypeError):
+                return (1, 0, str(k))
+        return {k: _sort_json_keys(v) for k, v in sorted(obj.items(), key=lambda x: _key(x[0]))}
+    if isinstance(obj, list):
+        return [_sort_json_keys(i) for i in obj]
+    return obj
 
 
 def refine_clustering(adata, cluster_type, curr_ref_id, cell_types_ref):
@@ -406,20 +419,18 @@ def refine_clustering(adata, cluster_type, curr_ref_id, cell_types_ref):
         best_candidate = None
         best_real_confidence = 0
         for curr_cell_type in clustering_merge_data['cell_types'][cluster_id]:
-            if (best_candidate is None or best_candidate['prob'] < curr_cell_type['prob']) and curr_cell_type['prob'] >= int(curr_cell_type['confidence_threshold']):
-                best_candidate = { 'cell_type': curr_cell_type['cell_type'], 'prob' : curr_cell_type['prob']  / 100 } #, 'real_confidence' : '{:.1%}'.format(curr_cell_type['prob'])} # * len(clustering_merge_data['cell_types'][cluster_id])) / 100.0) }
+            if curr_cell_type['prob'] >= int(curr_cell_type['confidence_threshold']):
+                best_candidate = { 'cell_type': curr_cell_type['cell_type'], 'prob' : curr_cell_type['prob']  / 100 }
                 best_real_confidence = curr_cell_type['prob']
+                break
 
         if best_real_confidence > 0:
             clustering_merge_data['candidates'][cluster_id] = best_candidate
             adata.obs.loc[adata.obs[cluster_type + "_ref" + curr_ref_id] == cluster_id, cluster_type + "_ref" + curr_ref_id] = best_candidate['cell_type']
             adata.obs.loc[adata.obs[cluster_type + "_ref" + curr_ref_id + "_p"] == cluster_id, cluster_type + "_ref" + curr_ref_id + "_p"] = '{:.1%}'.format(best_candidate['prob']) #best_candidate['real_confidence'][:-1]
 
-    clustering_merge_data["scores"] = OrderedDict(sorted(clustering_merge_data["scores"].items()))
-    clustering_merge_data["cell_types"] = OrderedDict(sorted(clustering_merge_data["cell_types"].items()))
-    clustering_merge_data["candidates"] = OrderedDict(sorted(clustering_merge_data["candidates"].items()))
     with open(os.path.join(data_folder, 'analysis', 'downstream', 'cell_types_result_' + cluster_type + curr_ref_id + '.json'), 'w') as outfile:
-        json.dump(clustering_merge_data, outfile, indent = 4)
+        json.dump(_sort_json_keys(clustering_merge_data), outfile, indent = 4)
 
 
 #Function to perform different cluster methods
@@ -449,7 +460,7 @@ def clustering(df_norm, markers):
         log("Dataset too big to create spatial plots per marker")
 
     #We calculate PCA, neighbors and UMAP for the anndata
-    sc.pp.pca(adata, n_comps=min(len(markers), 50))
+    sc.pp.pca(adata, n_comps=min(len(markers), 50, adata.n_obs - 1, adata.n_vars - 1))
 
     pca_loadings = adata.varm['PCs']
     loadings_df = pd.DataFrame(pca_loadings, index=adata.var_names, columns=[f'PC{i + 1}' for i in range(pca_loadings.shape[1])])
@@ -473,6 +484,9 @@ def clustering(df_norm, markers):
     log(f"n_neighbors set to {num_neighbors}")
     sc.pp.neighbors(adata, n_neighbors=num_neighbors)
     log("Neighbors graph calculated")
+
+    sq.gr.spatial_neighbors(adata, coord_type="generic", n_neighs=num_neighbors)
+    log("Spatial neighbors graph calculated")
 
     sc.tl.umap(adata)
     log("UMAP calculated")
@@ -583,8 +597,6 @@ def clustering(df_norm, markers):
             if neigh_cluster_id not in adata.obs:
                 adata.obs[neigh_cluster_id] = df_norm[neigh_cluster_id].astype('category')
             try:
-                sq.gr.spatial_neighbors(adata, coord_type="generic", n_neighs=num_neighbors)
-                log("Spatial neighbors graph calculated")
                 sq.gr.centrality_scores(adata, neigh_cluster_id)
                 sq.pl.centrality_scores(adata, neigh_cluster_id, save=(neigh_cluster_id + "_centrality_scores.jpg"))
                 log("Neighborhood centrality scores calculated")
@@ -672,7 +684,7 @@ def clustering(df_norm, markers):
 def neighborhood_cell_type_analysis(adata, neigh_cluster_id, k_values, density_threshold, data_folder, image_size):
     k_values = sorted(set(k_values))[:3]
     cell_types = adata.obs[neigh_cluster_id].astype(str).values
-    unique_types = sorted(set(cell_types))
+    unique_types = sorted(set(cell_types), key=lambda x: int(x) if x.lstrip('-').isdigit() else x)
     n_types = len(unique_types)
     type_to_idx = {t: i for i, t in enumerate(unique_types)}
     cell_type_idx = np.array([type_to_idx[t] for t in cell_types])

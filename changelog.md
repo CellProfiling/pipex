@@ -41,6 +41,11 @@ Changelog
 - **LMD export**
   New output mode for `generate_filtered_masks.py` that produces an XML cutting file compatible with Leica's Laser Microdissection software. Four parameters control the output geometry: `-shape_dilation` expands each cell outline by a given number of pixels, `-convolution_smoothing` controls contour smoothness, `-path_optimization` selects the cutting path order strategy (none, Hilbert, or greedy), and `-distance_heuristic` merges nearby shapes into a single cutting group to reduce stage movements.
 
+#### TissUUmaps export
+
+- **`-launch` parameter for `generate_tissuumaps.py`**
+  When set to `yes`, automatically starts a local HTTP server serving the `TissUUmaps_webexport` folder after export completes and opens the result in the default browser. The server runs on the first available port starting at 8080 and keeps running until the process is interrupted with `Ctrl+C`. Requires `include_html=yes` to have generated the webexport folder first.
+
 #### Extra scripts
 
 - **`extra/` folder**

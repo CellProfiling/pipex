@@ -191,6 +191,7 @@ There are currently available the following commands:
   - `-include_geojson=<yes or no to include cell segmentation as regions>` : example -> -include_geojson=yes. **OBS**: this includes the cell segmentation as regions in the TissUUmaps project. If this is not set, no regions will be included
   - `-compress_geojson=<yes or no to compress geojson regions into pbf>` : example -> -compress_geojson=yes. **OBS**: this includes the cell segmentation regions as a compressed pbf file
   - `-include_html=<yes or no to export html page for sharing the TissUUmaps project on the web>` : example -> -include_marker_images=yes. **OBS**: this includes the html page for sharing the TissUUmaps project on the web. A web server is needed to visualize the exported web page
+  - `-launch=<yes or no to automatically open the exported web page in a browser>` : example -> -launch=yes. **OBS**: requires `-include_html=yes`. Starts a local HTTP server on the first available port (starting at 8080) serving the `TissUUmaps_webexport` folder and opens it in the default browser. The server keeps running until the process is stopped with Ctrl+C
   
 *Example 2*: contents of `pipex_batch_list.txt` for the images from *example 1*
 <code>
@@ -291,7 +292,9 @@ If you add the `generate_tissuumaps` command to PIPEX command list a `anndata_Ti
  - Install TissUUmaps (https://tissuumaps.github.io/TissUUmaps-docs/docs/intro/installation.html)
  - Load the `anndata_TissUUmaps.h5ad` file in TissUUmaps
 
-If you add the `include_html=yes` parameter to the `generate_tissuumaps` command, a `TissUUmaps_webexport` folder will be generated in your analysis/downstream sub-folder. You can share this file on a web server, and access it from any web browser.
+If you add the `include_html=yes` parameter to the `generate_tissuumaps` command, a `TissUUmaps_webexport` folder will be generated in your analysis/downstream sub-folder. You can share this folder on a web server, and access it from any web browser.
+
+If you also add `launch=yes`, PIPEX will automatically start a local HTTP server and open the result in your default browser once the export is complete — no separate web server setup needed. The server runs on the first available port starting at 8080 and can be stopped with `Ctrl+C`.
 
 **NOTE**: TissUUmaps requires your images to be in `TIFF` format and be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
 
@@ -475,7 +478,7 @@ Annex 4: Cluster refinement procedure
 
 PIPEX's analysis step includes the possibility to perform multiple refinements of the unsupervised clustering results (leiden and/or kmeans). This can help you with the manual annotation and merging of the clusters automatically discovered.
 
-The idea behind the cluster refinement algorithm is to explore the ranked genes associated to each cluster and try to match them with rules stated by the user. The algorithm then assigns a confidence score per cluster and rule, depending how close its ranked genes are to the rule/s definition/s. Finally, the refinement picks per cluster the annotated cluster with higher confidence (ties are solved by row order).
+The idea behind the cluster refinement algorithm is to explore the ranked genes associated to each cluster and try to match them with rules stated by the user. The algorithm then assigns a confidence score per cluster and rule, depending how close its ranked genes are to the rule/s definition/s. Finally, the refinement picks per cluster the annotated cluster with matching or above confidence (ties are solved by row order).
 
 To use the cluster refinement, you have to create a `cell_types.csv` file with rows containing the following information:
 - `ref_id`: used as a suffix for the manually annotated cluster name. The final cluster name will be `leiden_ref[ref_id]` or `kmeans_ref[ref_id]`. Each unique `ref_id` group is an independent parallel refinement — it produces its own output column and JSON report, it does not filter the results of a previous ref_id. A typical use is a first ref_id with strict rules (`high` level, higher `min_confidence`) for well-defined populations, and a second ref_id with looser rules to catch remaining ambiguous clusters.
@@ -490,14 +493,14 @@ Here's and example of how a `cell_types.csv` file usually looks:
 <code>
 
     ref_id,cell_group,cell_type,cell_subtype,rank_filter,min_confidence,marker1,rule1,marker2,rule2,marker3,rule3
-    1,artifact,fold,unknown,all,10,CBS,high,CHGA,high,AMY2B,high
-    1,endocrine,islet,all,positive_only,10,CHGA,high,CPEP,high,AMY2B,low
-    1,exocrine,acinar,unknown1,all,10,CBS,high,AMY2B,high
-    1,endothelial,vessels,all,positive_only,30,CD31,high,aSMA,high
-    1,epithelial,ductal,unknown,all,10,KRT19,high,PANCK,high
-    1,immune,potential,artifact,all,10,HLADR,high,NPDC1,high,aSMA,low
-    2,immune,potential,artifact,all,0,HLADR,medium,NPDC1,medium
-    2,epithelial,ductal,unknown,all,0,KRT19,medium,PANCK,medium
+    1,artifact,fold,unknown,all,25,CBS,high,CHGA,high,AMY2B,high,,
+    1,endocrine,islet,all,positive_only,25,CHGA,high,CPEP,high,AMY2B,low
+    1,exocrine,acinar,unknown1,all,25CBS,high,AMY2B,high,,
+    1,endothelial,vessels,all,positive_only,30,CD31,high,aSMA,high,,
+    1,epithelial,ductal,unknown,all,25,KRT19,high,PANCK,high,,
+    1,immune,potential,artifact,all,25,HLADR,high,NPDC1,high,aSMA,low
+    2,immune,potential,artifact,all,10,HLADR,medium,NPDC1,medium,,
+    2,epithelial,ductal,unknown,all,10,KRT19,medium,PANCK,medium,,
 
 </code>
 

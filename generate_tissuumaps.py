@@ -1,12 +1,17 @@
+import os
+os.environ['PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION'] = 'python'
 import scanpy as sc
 import scipy
-import os
 import fnmatch
 import json
 import copy
 import datetime
 import sys
 import argparse
+import threading
+import webbrowser
+import http.server
+import socketserver
 from skimage.measure import approximate_polygon
 import numpy as np
 from pipex_utils import log
@@ -16,6 +21,7 @@ include_marker_images = "no"
 include_geojson = "no"
 compress_geojson = "no"
 include_html = "no"
+launch = "no"
 
 def find_marker_file(folder, marker):
     """Return the filename of the first image in folder whose name ends with marker."""
@@ -173,6 +179,8 @@ def options(argv):
         help='compress geojson regions into pbf : example -> -compress_geojson=yes')
     parser.add_argument('--include_html', choices=['yes', 'no'], default='no',
         help='export html page for web sharing : example -> -include_html=yes')
+    parser.add_argument('--launch', choices=['yes', 'no'], default='no',
+        help='launch local web server and open browser after export : example -> -launch=yes')
     if not argv:
         parser.print_help()
         sys.exit()
@@ -185,6 +193,7 @@ if __name__ =='__main__':
     include_geojson = args.include_geojson
     compress_geojson = args.compress_geojson
     include_html = args.include_html
+    launch = args.launch
 
     pidfile_filename = './RUNNING'
     if "PIPEX_WORK" in os.environ:
@@ -198,5 +207,35 @@ if __name__ =='__main__':
     log("Start time exporting tissuumaps")
 
     exporting_tissuumaps()
+
+    if launch == "yes":
+        webexport_path = os.path.join(data_folder, 'analysis', 'downstream', 'TissUUmaps_webexport')
+        if not os.path.isdir(webexport_path):
+            print(">>> WARNING: TissUUmaps webexport directory not found, cannot launch", flush=True)
+        else:
+            port = 8080
+            while port < 8200:
+                try:
+                    handler = http.server.SimpleHTTPRequestHandler
+                    handler.log_message = lambda *args: None
+                    httpd = socketserver.TCPServer(("", port), handler)
+                    break
+                except OSError:
+                    port += 1
+            else:
+                print(">>> WARNING: could not find a free port to launch TissUUmaps", flush=True)
+                httpd = None
+            if httpd:
+                os.chdir(webexport_path)
+                thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+                thread.start()
+                url = f"http://localhost:{port}"
+                print(f">>> TissUUmaps running at {url} — press Ctrl+C to stop", flush=True)
+                webbrowser.open(url)
+                try:
+                    thread.join()
+                except KeyboardInterrupt:
+                    httpd.shutdown()
+                    print(">>> TissUUmaps server stopped", flush=True)
 
     log("End time exporting tissuumaps")

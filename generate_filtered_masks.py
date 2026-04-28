@@ -2,6 +2,8 @@ import sys
 import os
 import argparse
 import datetime
+import matplotlib
+matplotlib.use('Agg')
 import pandas as pd
 import numpy as np
 from skimage.io import imsave

@@ -148,7 +148,7 @@ column = [[sg.Text('PIPEX data folder:', font=_FONT), sg.In(default_text=data_fo
           [sg.Text('  - min-max normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',default=True,disabled=True, key='-ANALYSIS_MMNOR-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_39)],
           [sg.Text('  - Batch correction by column:',s=35, pad=((20,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_BATCOR-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_38)],
           [sg.Text('  - Quantile normalization:',s=35, pad=((20,0), (0,0))), sg.Checkbox('',disabled=True, key='-ANALYSIS_QUANOR-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_36)],
-          [sg.Text('  - Perform leiden cluster', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_LEIDEN-', disabled=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_29)],
+          [sg.Text('  - Perform leiden cluster', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_LEIDEN-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_29)],
           [sg.Text('  - Leiden resolution:',s=35, pad=((40,0), (0,0))), sg.Input(default_text='0.5',s=20,disabled=True, key='-ANALYSIS_LEIDENRES-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_48)],
           [sg.Text('  - Perform Kmeans cluster', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_KMEANS-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_30)],
           [sg.Text('  - K clusters:',s=35, pad=((40,0), (0,0))), sg.Input(default_text='10',s=20,disabled=True, key='-ANALYSIS_KCLUST-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_32)],
@@ -190,7 +190,8 @@ column = [[sg.Text('PIPEX data folder:', font=_FONT), sg.In(default_text=data_fo
           [sg.Text('  - Include marker images, comma-separated:', s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='',s=40,disabled=True, key='-TISSUUMAPS_MARKER-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_48)],
           [sg.Text('  - Include regions', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_REGION-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_49)],
           [sg.Text('  - Compress regions', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_COMPRESS_REGIONS-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_50)],
-          [sg.Text('  - Include html', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_HTML-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_51)]]
+          [sg.Text('  - Include html', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_HTML-', disabled=True, enable_events=True, default=False), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_51)],
+          [sg.Text('  - Launch in browser after export', pad=((20,0), (0,0))), sg.Checkbox('',key='-TISSUUMAPS_LAUNCH-', disabled=True, default=False)]]
 
 layout = [[sg.Column(column, scrollable=True,  vertical_scroll_only=True, size=(GUI_WIDTH, GUI_HEIGHT))],
           [sg.Text('_'*85)],
@@ -269,6 +270,7 @@ while True:
         window['-ANALYSIS_QUANOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_BATCOR-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_LEIDEN-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_LEIDENRES-'].update(disabled=True)
         window['-ANALYSIS_KMEANS-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS-']))
@@ -278,11 +280,14 @@ while True:
         window['-ANALYSIS_NEIKVAL-'].update(disabled=True)
         window['-ANALYSIS_NEIDEN-'].update(disabled=True)
         if (values['-ANALYSIS-']):
+            window['-ANALYSIS_LEIDENRES-'].update(disabled=(not values['-ANALYSIS_LEIDEN-']))
             window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
             window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
             window['-ANALYSIS_NEICLU-'].update(disabled=(not values['-ANALYSIS_NEIGH-']))
             window['-ANALYSIS_NEIKVAL-'].update(disabled=(not values['-ANALYSIS_NEIGH-']))
             window['-ANALYSIS_NEIDEN-'].update(disabled=(not values['-ANALYSIS_NEIGH-']))
+    if event == '-ANALYSIS_LEIDEN-':
+            window['-ANALYSIS_LEIDENRES-'].update(disabled=(not values['-ANALYSIS_LEIDEN-']))
     if event == '-ANALYSIS_KMEANS-':
             window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
             window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS_KMEANS-']))
@@ -340,6 +345,7 @@ while True:
         window['-TISSUUMAPS_REGION-'].update(disabled=(not values['-TISSUUMAPS-']))
         window['-TISSUUMAPS_COMPRESS_REGIONS-'].update(disabled=(not values['-TISSUUMAPS-']))
         window['-TISSUUMAPS_HTML-'].update(disabled=(not values['-TISSUUMAPS-']))
+        window['-TISSUUMAPS_LAUNCH-'].update(disabled=(not values['-TISSUUMAPS-']))
 
 window.close()
 
@@ -476,7 +482,8 @@ if values['-TISSUUMAPS-']:
         ' -include_marker_images="' + values['-TISSUUMAPS_MARKER-'] + '"' +
         ' -include_geojson=' + ('yes' if values['-TISSUUMAPS_REGION-'] else 'no') +
         ' -compress_geojson=' + ('yes' if values['-TISSUUMAPS_COMPRESS_REGIONS-'] else 'no') +
-        ' -include_html=' + ('yes' if values['-TISSUUMAPS_HTML-'] else 'no'))
+        ' -include_html=' + ('yes' if values['-TISSUUMAPS_HTML-'] else 'no') +
+        ' -launch=' + ('yes' if values['-TISSUUMAPS_LAUNCH-'] else 'no'))
 
 if (batch_list != ''):
     batch_list = '#Auto-generated by PIPEX GUI' + batch_list + '\n'
