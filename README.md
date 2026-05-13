@@ -74,6 +74,7 @@ Installation
 - `sudo apt-get install -y gcc`
 - `sudo apt-get install python3-tk`
 
+[Note] There's available an in depth step-by-step guide to install PIPEX in case you want a more detailed set of instructions. Please refer to [them](./step_by_step_installation_v2.md)
 
 
 Running PIPEX
