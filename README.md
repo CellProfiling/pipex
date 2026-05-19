@@ -40,7 +40,7 @@ Why PIPEX
 Requirements
 ------------
 
-- Any regular linux distribution or windows with a modern python 3 installation. [Note] a docker image is also provided.
+- Any regular linux distribution, windows 10+ or MacOS with a modern python 3 installation. [Note] a docker image is also provided.
 - Enough RAM (and/or SSD hard disk to be used as swap memory in case of linux) to handle the working images' resolution. As a guideline:
   - Up to 6k resolution -> 8GB.
   - Up to 12k resolution -> 16GB. 
@@ -67,12 +67,27 @@ Installation
 - Profit!
 
 [Note] a docker image is also provided. Just remember to configure the environment variable for PIPEX's "work" directory.
+
 [Note] if you are installing PIPEX in your own linux laptop you might need some other packages/libraries. Please install these:
-- `sudo apt-get install python3.11-dev`
-- `sudo apt-get install libvips`
-- `sudo apt-get install -y python3-opencv`
-- `sudo apt-get install -y gcc`
-- `sudo apt-get install python3-tk`
+```
+sudo apt-get install python3.11-dev
+sudo apt-get install libvips
+sudo apt-get install -y python3-opencv
+sudo apt-get install -y gcc
+sudo apt-get install python3-tk
+```
+
+[Note] For MacOS, if you installed the native MacOS version of python you need to install this as well:
+```
+open /Applications/Python\ 3.*/Install\ Certificates.command
+```
+
+...and probably you will have problems with TensorFlow because of your Mx processor. To fix that, go to `segmentation.py` script and add these lines 
+```
+import tensorflow as tf
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+```
 
 [Note] There's available an in depth step-by-step guide to install PIPEX in case you want a more detailed set of instructions. Please refer to [them](./step_by_step_installation_v2.md)
 
