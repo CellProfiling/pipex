@@ -427,7 +427,7 @@ def options(argv):
         help='balance tiles : example -> -balance_tiles=yes')
     parser.add_argument('--stitch_size', type=int, default=0,
         help='number of pixels : example -> -stitch_size=20')
-    parser.add_argument('--tophat_radius', type=int, default=0,
+    parser.add_argument('--tophat_radius', type=lambda s: 0 if s.strip() == '' else int(s), default=0,
         help='tophat filter radius in pixels : example -> -tophat_radius=10')
     parser.add_argument('--exposure', type=lambda s: int(s) / 100, default=1.0,
         help='percentage of base intensity : example -> -exposure=300')

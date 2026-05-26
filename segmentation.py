@@ -1,6 +1,10 @@
 import sys
 import os
 import argparse
+import warnings
+import logging
+warnings.filterwarnings('ignore')
+logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
@@ -159,7 +163,14 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                 membrane_img = (membrane_img_orig - mem_min) / mem_range
 
             membrane_keep_index = -1
-            membrane_intensity_mean = threshold_multiotsu(membrane_img, 5)[0]
+            for _n_classes in range(5, 1, -1):
+                try:
+                    membrane_intensity_mean = threshold_multiotsu(membrane_img, _n_classes)[0]
+                    break
+                except ValueError:
+                    if _n_classes == 2:
+                        membrane_intensity_mean = np.mean(membrane_img)
+                        print(">>> WARNING: membrane image has too few unique values for multi-Otsu, using mean as threshold", flush=True)
             tiles = []
             if len(membrane_img) > watershed_tile_threshold or len(membrane_img[0]) > watershed_tile_threshold:
                 num_rows = int(len(membrane_img) / watershed_tile_size)
@@ -422,7 +433,7 @@ def options(argv):
         help='type of the custom segmentation : example -> -custom_segmentation_type=full')
     parser.add_argument('--measure_markers', type=lambda s: [x.strip() for x in s.split(',')], default=[],
         help='list of marker names to measure : example -> -measure_markers=AMY2A,SST,GORASP2')
-    parser.add_argument('--gmm_min_separation', type=float, default=0.5,
+    parser.add_argument('--gmm_min_separation', type=lambda s: 0.5 if s.strip() == '' else float(s), default=0.5,
         help='minimum separation between GMM components (in combined std units) to trust the fit and compute gmm_prob : example -> -gmm_min_separation=0.5')
     if not argv:
         parser.print_help()

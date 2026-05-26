@@ -1,9 +1,12 @@
 import sys
 import os
 import argparse
+import warnings
+import logging
 import math
 from collections import OrderedDict
-
+warnings.filterwarnings('ignore')
+logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["NUM_THREADS"] = "1"
@@ -829,7 +832,7 @@ def options(argv):
         help='comma-separated suffixes for marker input columns : example -> -use_bin=_local_90')
     parser.add_argument('--leiden', choices=['yes', 'no'], default='no',
         help='perform leiden clustering : example -> -leiden=yes')
-    parser.add_argument('--leiden_res', type=float, default=0.5,
+    parser.add_argument('--leiden_res', type=lambda s: 0.5 if s.strip() == '' else float(s), default=0.5,
         help='leiden resolution, higher values produce more clusters : example -> -leiden_res=0.5')
     parser.add_argument('--kmeans', choices=['yes', 'no'], default='no',
         help='perform kmeans clustering : example -> -kmeans=yes')
@@ -842,9 +845,9 @@ def options(argv):
     parser.add_argument('--neigh_cluster_id', default='',
         help='cluster column for neighborhood analysis : example -> -neigh_cluster_id=kmeans')
     parser.add_argument('--neigh_k_values', default=[1, 5, 10],
-        type=lambda s: sorted(set(int(x.strip()) for x in s.split(',')))[:3],
+        type=lambda s: [1, 5, 10] if s.strip() == '' else sorted(set(int(x.strip()) for x in s.split(',')))[:3],
         help='up to 3 k values for neighbor composition (max 3) : example -> -neigh_k_values=1,5,10')
-    parser.add_argument('--neigh_density_threshold', type=float, default=0.05,
+    parser.add_argument('--neigh_density_threshold', type=lambda s: 0.05 if s.strip() == '' else float(s), default=0.05,
         help='fraction of cell type size to distinguish sparse vs dense clusters : example -> -neigh_density_threshold=0.05')
     if not argv:
         parser.print_help()

@@ -5,7 +5,7 @@ WORKDIR /opt/pipex
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-RUN apt-get update && apt-get install -y libvips
+RUN apt-get update && apt-get install -y libvips libgl1 libglib2.0-0
 
 # Temporary install gcc, needed for some of the requirements
 RUN apt-get install -y gcc g++
