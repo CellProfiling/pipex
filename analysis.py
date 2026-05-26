@@ -598,7 +598,18 @@ def clustering(df_norm, markers):
                 adata.obs[neigh_cluster_id] = df_norm[neigh_cluster_id].astype('category')
             try:
                 sq.gr.centrality_scores(adata, neigh_cluster_id)
-                sq.pl.centrality_scores(adata, neigh_cluster_id, save=(neigh_cluster_id + "_centrality_scores.jpg"))
+                sq.pl.centrality_scores(adata, neigh_cluster_id)
+                _cs_fig = plt.gcf()
+                _cs_handles, _cs_labels = None, None
+                for _cs_ax in _cs_fig.get_axes():
+                    if _cs_ax.get_legend():
+                        if _cs_handles is None:
+                            _cs_handles, _cs_labels = _cs_ax.get_legend_handles_labels()
+                        _cs_ax.get_legend().remove()
+                if _cs_handles:
+                    _cs_fig.legend(_cs_handles, _cs_labels, loc="center left", bbox_to_anchor=(1.0, 0.5))
+                _cs_fig.savefig(os.path.join(sc.settings.figdir, neigh_cluster_id + "_centrality_scores.jpg"), bbox_inches="tight")
+                plt.close(_cs_fig)
                 log("Neighborhood centrality scores calculated")
             except Exception as e:
                 log("Neighborhood analysis failed: " + str(e))

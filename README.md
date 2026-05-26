@@ -110,7 +110,7 @@ The images in the data folder must reside in the base level (no sub-folders allo
 
 ![Example 1](./doc/doc1.jpg "Example 1")
 
-**NOTE**: if you plan to use TissUUmaps integration, it requires your images to be in `TIFF` format and be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
+**NOTE**: if you plan to use TissUUmaps integration, your images must be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, `hne.png`, etc...). Any format supported by `libvips` (TIFF, PNG, JPEG, etc.) will work.
 
 <div style="page-break-after: always;"></div>
 
@@ -312,7 +312,7 @@ If you add the `include_html=yes` parameter to the `generate_tissuumaps` command
 
 If you also add `launch=yes`, PIPEX will automatically start a local HTTP server and open the result in your default browser once the export is complete — no separate web server setup needed. The server runs on the first available port starting at 8080 and can be stopped with `Ctrl+C`.
 
-**NOTE**: TissUUmaps requires your images to be in `TIFF` format and be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, etc...)
+**NOTE**: TissUUmaps requires your images to be named exactly as your markers (for example: `DAPI.tif`, `CPEP.tif`, `hne.png`, etc...). Any format supported by `libvips` (TIFF, PNG, JPEG, etc.) will work.
 
 
 
