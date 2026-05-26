@@ -3,11 +3,16 @@ import os
 import argparse
 import warnings
 import logging
-warnings.filterwarnings('ignore')
-logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ['TF_USE_LEGACY_KERAS'] = '1'
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["GOTO_NUM_THREADS"] = "1"
+os.environ["BLIS_NUM_THREADS"] = "1"
+warnings.filterwarnings('ignore')
+logging.disable(logging.WARNING)
 import datetime
 
 import numpy as np

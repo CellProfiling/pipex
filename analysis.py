@@ -5,12 +5,14 @@ import warnings
 import logging
 import math
 from collections import OrderedDict
-warnings.filterwarnings('ignore')
-logging.disable(logging.WARNING)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["NUM_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["GOTO_NUM_THREADS"] = "1"
+os.environ["BLIS_NUM_THREADS"] = "1"
+warnings.filterwarnings('ignore')
+logging.disable(logging.WARNING)
 import datetime
 from pipex_utils import log, sanitize_marker_list, validate_marker_columns
 import numpy as np
