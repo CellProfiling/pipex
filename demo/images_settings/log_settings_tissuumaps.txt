@@ -1,0 +1,2 @@
+>>> Start time tissuumaps =  18:59:22_18/06/2026
+generate_tissuumaps.py -data=./work/pyshowwwcase/pipex/mariyama/PIPEX_demo_pancreatic_cancer -include_marker_images=DAPI,ARL13B,ATM,Bcl2,BetaActin,CD107a,CD11c,CD14,CD163,CD20,CD31,CD34,CD39,CD3e,CD40,CD44,CD45,CD4,CD56,CD68,CD8,Caveolin,CollagenIV,Ecadherin,ER,EpCam,GP100,HIF1A,HLAA,HLADR,Histone,ICOS,IDO1,KRT5,KRT8,Ki67,PCNA,PCNT,PD1,PDL1,PanCK,Podoplanin,SMA,SOX2,TOX,VISTA,Vimentin,bCatenin1,iNOS -include_geojson=yes -compress_geojson=yes -include_html=yes
