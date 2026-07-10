@@ -49,6 +49,7 @@ kmeans = "no"
 k_estimation = "no"
 k_clusters = 10
 refine_clusters = "no"
+hierarchical_gating = "no"
 neigh_cluster_id = ""
 neigh_k_values = [1, 5, 10]
 neigh_density_threshold = 0.05
@@ -438,6 +439,100 @@ def refine_clustering(adata, cluster_type, curr_ref_id, cell_types_ref):
         json.dump(_sort_json_keys(clustering_merge_data), outfile, indent = 4)
 
 
+#Trapezoidal membership functions for per-cell hierarchical gating (0-100 scale).
+#Each level has a flat "perfect score" plateau with graded shoulders, so scoring is robust
+#to small value shifts and 'none' (absent) is distinct from 'low' (present but low).
+#NOTE: gating-only. Cluster refinement keeps using check_cell_type_threshold (unchanged).
+_GATING_MF = {
+    'none':   ([0.0, 12.5, 25.0],                        [100.0, 100.0, 0.0]),
+    'low':    ([0.0, 12.5, 37.5, 50.0],                  [0.0, 100.0, 100.0, 0.0]),
+    'medium': ([18.75, 25.0, 37.5, 62.5, 75.0, 81.25],   [0.0, 50.0, 100.0, 100.0, 50.0, 0.0]),
+    'high':   ([68.75, 75.0, 87.5, 100.0],               [0.0, 50.0, 100.0, 100.0]),
+}
+
+
+def _gating_rule_score(rule, v):
+    xs, ys = _GATING_MF.get(rule, _GATING_MF['medium'])
+    return np.interp(v, xs, ys)
+
+
+#Function to perform per-cell hierarchical gating from cell_types.csv (one independent round per ref_id)
+def compute_hierarchical_gating(df_norm, markers, cell_types, adata):
+    #Robust 1-99 percentile re-scale of each selected marker into [0,100], on top of whatever
+    #normalization the user already applied to df_norm. This re-bounds any input (z-score included)
+    #so the high/medium/low rule levels are comparable across markers.
+    scaled = {}
+    for m in markers:
+        col = df_norm[m].astype(float).values
+        lo, hi = np.percentile(col, [1, 99])
+        scaled[m] = np.clip((col - lo) / (hi - lo), 0.0, 1.0) * 100.0 if hi > lo else np.zeros(len(col))
+
+    n_cells = len(df_norm)
+    ref_ids = list(cell_types['ref_id'].unique())
+    added_cols = []
+    merged = np.array([''] * n_cells, dtype=object) if len(ref_ids) > 1 else None
+
+    for curr_ref_id in ref_ids:
+        rows = cell_types[cell_types['ref_id'] == curr_ref_id]
+        labels = np.array(['unknown'] * n_cells, dtype=object)
+        probs = np.zeros(n_cells)
+        assigned = np.zeros(n_cells, dtype=bool)
+
+        #File order is the decision-list priority: first qualifying rule wins, then the cell is peeled off
+        for _, row in rows.iterrows():
+            rank_filter = row['rank_filter']
+            conf = np.zeros(n_cells)
+            num_rules = 0
+            disqualified = np.zeros(n_cells, dtype=bool)
+            n = 1
+            while ('marker' + str(n)) in row and not pd.isnull(row['marker' + str(n)]):
+                curr_marker = row['marker' + str(n)]
+                curr_rule = row['rule' + str(n)]
+                n += 1
+                if curr_marker in scaled:
+                    conf = conf + _gating_rule_score(curr_rule, scaled[curr_marker])
+                    num_rules += 1
+                elif rank_filter != 'none':
+                    disqualified[:] = True
+            if num_rules > 0:
+                conf = conf / num_rules
+            threshold = float(row['min_confidence'])
+            match = (~assigned) & (~disqualified) & (conf >= threshold)
+            cell_type_name = '.'.join(part for part in [row['cell_group'], row['cell_type'], row['cell_subtype']]
+                                      if str(part).strip() not in ('', 'nan'))
+            labels[match] = cell_type_name
+            probs[match] = conf[match]
+            assigned |= match
+
+        col = 'gating_ref' + str(curr_ref_id)
+        df_norm[col] = labels
+        df_norm[col + '_p'] = ['{:.1%}'.format(p / 100.0) for p in probs]
+        uniq = sorted(set(labels))
+        color_map = {lab: random_rgb_color(uniq.index(lab)) for lab in uniq}
+        df_norm[col + '_color'] = [color_map[lab] for lab in labels]
+        added_cols += [col, col + '_p', col + '_color']
+
+        #Drive the standard downstream plots (UMAP/spatial/rank_genes/heatmap), like leiden/kmeans do
+        adata.obs[col] = pd.Categorical(labels)
+        try:
+            calculate_cluster_info(adata, col, markers)
+        except Exception as e:
+            log('Hierarchical gating plots failed for ' + col + ': ' + str(e))
+
+        if merged is not None:
+            merged = np.where(merged == '', labels.astype(str), merged + '-' + labels.astype(str))
+
+        log('Hierarchical gating ' + col + ' done: ' + str({lab: int((labels == lab).sum()) for lab in uniq}))
+
+    if merged is not None:
+        df_norm['gating_ref_merged'] = merged
+        uniq_merged = list(pd.unique(merged))
+        df_norm['gating_ref_merged_color'] = [random_rgb_color(uniq_merged.index(x)) for x in merged]
+        added_cols += ['gating_ref_merged', 'gating_ref_merged_color']
+
+    return added_cols
+
+
 #Function to perform different cluster methods
 def clustering(df_norm, markers):
     adata = sc.AnnData(df_norm[markers])
@@ -498,7 +593,7 @@ def clustering(df_norm, markers):
     sc.pl.umap(adata, show=False, save='_base')
 
     cell_types = None
-    if refine_clusters == "yes":
+    if refine_clusters == "yes" or hierarchical_gating == "yes":
         try:
             _ct = pd.read_csv(os.path.join(data_folder, 'cell_types.csv'))
             _ct['ref_id'] = _ct['ref_id'].astype(str)
@@ -509,6 +604,10 @@ def clustering(df_norm, markers):
         except Exception as e:
             print(e)
             log("Failed to read cell_types.csv")
+
+    gating_cols = []
+    if hierarchical_gating == "yes" and cell_types is not None:
+        gating_cols = compute_hierarchical_gating(df_norm, markers, cell_types, adata)
 
     if leiden == 'yes':
         #We calculate leiden cluster
@@ -620,7 +719,7 @@ def clustering(df_norm, markers):
                 log("Neighborhood analysis failed: " + str(e))
             neighborhood_cell_type_analysis(adata, neigh_cluster_id, neigh_k_values, neigh_density_threshold, data_folder, image_size)
 
-    if leiden == 'yes' or kmeans == 'yes':
+    if leiden == 'yes' or kmeans == 'yes' or (hierarchical_gating == 'yes' and gating_cols):
         df = pd.read_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'))
         if leiden == 'yes':
             obs_by_id = adata.obs.set_index('id')
@@ -692,6 +791,12 @@ def clustering(df_norm, markers):
             sns.heatmap(df_corr, annot=True, annot_kws={"fontsize":kmeans_heatmap_fontsize}, fmt='.2f', cmap='coolwarm', vmin=-1, vmax=1, center = 0, square = True, linewidths=.1, cbar=True, ax=ax1)
             fig1.savefig(os.path.join(data_folder, 'analysis', 'downstream', 'kmeans_clusters_correlation_heatmap.jpg'))
             plt.close(fig1)
+
+        if hierarchical_gating == 'yes' and gating_cols:
+            src = df_norm.set_index('cell_id')
+            for col in gating_cols:
+                df[col] = df['cell_id'].map(src[col])
+                df[col] = df[col].fillna('' if col.endswith('_p') or col.endswith('_color') else 'unknown')
 
         df.to_csv(os.path.join(data_folder, 'analysis', 'cell_data.csv'), index=False)
         df_norm.to_csv(os.path.join(data_folder, 'analysis', 'downstream', 'cell_data_norm.csv'), index=False)
@@ -844,6 +949,8 @@ def options(argv):
         help='force k number of clusters in kmeans : example -> -k_clusters=10')
     parser.add_argument('--refine_clusters', choices=['yes', 'no'], default='no',
         help='refine cluster results : example -> -refine_clusters=yes')
+    parser.add_argument('--hierarchical_gating', choices=['yes', 'no'], default='no',
+        help='perform per-cell hierarchical gating from cell_types.csv : example -> -hierarchical_gating=yes')
     parser.add_argument('--neigh_cluster_id', default='',
         help='cluster column for neighborhood analysis : example -> -neigh_cluster_id=kmeans')
     parser.add_argument('--neigh_k_values', default=[1, 5, 10],
@@ -876,6 +983,7 @@ if __name__ =='__main__':
     k_estimation = args.k_estimation
     k_clusters = args.k_clusters
     refine_clusters = args.refine_clusters
+    hierarchical_gating = args.hierarchical_gating
     neigh_cluster_id = args.neigh_cluster_id
     neigh_k_values = args.neigh_k_values
     neigh_density_threshold = args.neigh_density_threshold

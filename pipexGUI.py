@@ -97,6 +97,8 @@ tooltip_59 = '<optional, up to 3 comma-separated k values for neighbor compositi
 tooltip_60 = '<optional, fraction of cell type size to distinguish sparse vs dense spatial clusters>: \nexample -> 0.05'
 tooltip_61 = '<optional, yes or no to perform neighborhood cell type analysis>: \nexample -> yes'
 tooltip_62 = '<optional, minimum separation between GMM components in combined std units; below this value gmm_prob is set to NaN>: \nexample -> 0.5'
+tooltip_63 = '<optional, yes or no to perform per-cell hierarchical gating through cell_types.csv data>: \nexample -> yes'
+tooltip_64 = '<optional, minimum fractional area growth over the bare nucleus for a watershed cell to be trusted as membrane-guided; below this the nuclei+expansion is kept>: \nexample -> 0.05'
 
 
 
@@ -131,6 +133,7 @@ column = [[sg.Text('PIPEX data folder:', font=_FONT), sg.In(default_text=data_fo
           [sg.Text('  - MEMBRANE diameter:',s=35, pad=((40,0), (0,0))), sg.Input(default_text='25',s=20,disabled=True, key='-SEGMENTATION_MEMDIAM-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_5)],
           [sg.Text('  - MEMBRANE compactness:',s=35, pad=((40,0), (0,0))), sg.Input(default_text='0.9',s=20,disabled=True, key='-SEGMENTATION_MEMCOMP-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_6)],
           [sg.Text('  - Keep membrane without nuclei:',s=35, pad=((40,0), (0,0))), sg.Checkbox('',disabled=True, key='-SEGMENTATION_MEMKEEP-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_33)],
+          [sg.Text('  - MEMBRANE min growth:',s=35, pad=((40,0), (0,0))), sg.Input(default_text='0.05',s=20,disabled=True, key='-SEGMENTATION_MEMGROW-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_64)],
           [sg.Text('  - Custom segmentation:', s=35, pad=((20,0), (0,0))), sg.In(default_text="", size=(30,1),disabled=True, key='-SEGMENTATION_CUSSEG-'), sg.FileBrowse(initial_folder=data_folder), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_46)],
           [sg.Text('  - Custom segmentation type:', s=35, pad=((20,0), (0,0))), sg.Combo(['full', 'nuc', 'mem'], default_value='full', key='-SEGMENTATION_CUSSTY-', disabled=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_35)],
           [sg.Text('  - Measure markers, comma-separated:',s=(35,1), pad=((20,0), (0,0))), sg.Input(default_text='GORASP2,AMY2A',s=40,disabled=True, key='-SEGMENTATION_MEASURE-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_8)],
@@ -154,6 +157,7 @@ column = [[sg.Text('PIPEX data folder:', font=_FONT), sg.In(default_text=data_fo
           [sg.Text('  - K clusters:',s=35, pad=((40,0), (0,0))), sg.Input(default_text='10',s=20,disabled=True, key='-ANALYSIS_KCLUST-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_32)],
           [sg.Text('  - Calculate k estimation', pad=((40,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_ELBOW-', disabled=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_31)],
           [sg.Text('  - Refine clusters', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_REFINE-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_47)],
+          [sg.Text('  - Perform hierarchical gating', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_GATING-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_63)],
           [sg.Text('  - Perform neighborhood analysis', pad=((20,0), (0,0))), sg.Checkbox('',key='-ANALYSIS_NEIGH-', disabled=True, enable_events=True), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_61)],
           [sg.Text('  - Neighborhood analysis over column:',s=(35,1), pad=((40,0), (0,0))), sg.Input(default_text='',s=20,disabled=True, key='-ANALYSIS_NEICLU-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_7)],
           [sg.Text('  - Neighbor k values, comma-separated:',s=(35,1), pad=((40,0), (0,0))), sg.Input(default_text='1,5,10',s=20,disabled=True, key='-ANALYSIS_NEIKVAL-'), sg.Image(data=info_icon,subsample=_SUBSAMPLE,tooltip=tooltip_59)],
@@ -244,6 +248,7 @@ while True:
         window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMCOMP-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEMKEEP-'].update(disabled=(not values['-SEGMENTATION-']))
+        window['-SEGMENTATION_MEMGROW-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_CUSSEG-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_CUSSTY-'].update(disabled=(not values['-SEGMENTATION-']))
         window['-SEGMENTATION_MEASURE-'].update(disabled=(not values['-SEGMENTATION-']))
@@ -253,11 +258,13 @@ while True:
             window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
             window['-SEGMENTATION_MEMCOMP-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
             window['-SEGMENTATION_MEMKEEP-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
+            window['-SEGMENTATION_MEMGROW-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
     if event == '-SEGMENTATION_MEMUSE-':
         window['-SEGMENTATION_MEMMARK-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
         window['-SEGMENTATION_MEMDIAM-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
         window['-SEGMENTATION_MEMCOMP-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
         window['-SEGMENTATION_MEMKEEP-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
+        window['-SEGMENTATION_MEMGROW-'].update(disabled=(not values['-SEGMENTATION_MEMUSE-']))
     if event == '-ANALYSIS-':
         window['-ANALYSIS_SIZE-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_MARKER-'].update(disabled=(not values['-ANALYSIS-']))
@@ -275,6 +282,7 @@ while True:
         window['-ANALYSIS_ELBOW-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_KCLUST-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_REFINE-'].update(disabled=(not values['-ANALYSIS-']))
+        window['-ANALYSIS_GATING-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_NEIGH-'].update(disabled=(not values['-ANALYSIS-']))
         window['-ANALYSIS_NEICLU-'].update(disabled=True)
         window['-ANALYSIS_NEIKVAL-'].update(disabled=True)
@@ -394,7 +402,8 @@ if values['-SEGMENTATION-']:
             ' -membrane_marker=' + values['-SEGMENTATION_MEMMARK-'] +
             ' -membrane_diameter=' + values['-SEGMENTATION_MEMDIAM-'] +
             ' -membrane_compactness=' + values['-SEGMENTATION_MEMCOMP-'] +
-            ' -membrane_keep=' + ('yes' if values['-SEGMENTATION_MEMKEEP-'] else 'no'))
+            ' -membrane_keep=' + ('yes' if values['-SEGMENTATION_MEMKEEP-'] else 'no') +
+            ' -membrane_min_growth=' + values['-SEGMENTATION_MEMGROW-'])
     if (values['-SEGMENTATION_CUSSEG-'] != ''):
         batch_list = (batch_list +
             ' -custom_segmentation=' + custom_segmentation_file +
@@ -432,6 +441,9 @@ if values['-ANALYSIS-']:
     if (values['-ANALYSIS_REFINE-']):
         batch_list = (batch_list +
             ' -refine_clusters=' + ('yes' if values['-ANALYSIS_REFINE-'] else 'no'))
+    if (values['-ANALYSIS_GATING-']):
+        batch_list = (batch_list +
+            ' -hierarchical_gating=' + ('yes' if values['-ANALYSIS_GATING-'] else 'no'))
     if (values['-ANALYSIS_NEIGH-']):
         batch_list = (batch_list +
             ' -neigh_cluster_id=' + values['-ANALYSIS_NEICLU-'] +

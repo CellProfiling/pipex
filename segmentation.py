@@ -53,6 +53,7 @@ membrane_marker = ""
 membrane_diameter = 0
 membrane_compactness = 0.9
 membrane_keep = "no"
+membrane_min_growth = 0.05
 adjust_images = 0
 custom_segmentation = ""
 custom_segmentation_type = "full"
@@ -218,11 +219,27 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                     imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_tile_" + tile_desc + "_result.jpg"), np.uint8(mark_boundaries(tile_orig, ws_labels) * 255))
                     log("Watershed of tile " + tile_desc + " result image saved")
 
-                    # Apply membrane-guided cell boundaries to sd_labels_expanded
+                    # A watershed cell only carries membrane information if it grew beyond its seed
+                    # nucleus: with no membrane to flood into, the mask collapses to the bare nucleus
+                    # footprint. Cells that grew less than membrane_min_growth are dropped so they
+                    # don't override the trusted nuclei+expansion.
+                    n_labels = int(max(ws_labels.max(), tile_nuc_slice.max())) + 1
+                    ws_area = np.bincount(ws_labels.ravel(), minlength=n_labels)
+                    nuc_area = np.bincount(tile_nuc_slice.ravel(), minlength=n_labels)
+                    grew = ws_area > nuc_area * (1.0 + membrane_min_growth)
+                    grew[0] = False
+                    ws_labels[~grew[ws_labels]] = 0
+
+                    # Combine watershed with nuclei+expansion: membrane carves inward while the
+                    # expansion caps outward. Repaint expansion pixels that a surviving membrane cell
+                    # claims, but never grow past the expansion (ws beyond all expansions is not
+                    # painted) and keep the expansion untouched on open sides (dark background, ws == 0).
                     tile_exp = sd_labels_expanded[tile_x:tile_x + len(ws_labels), tile_y:tile_y + len(ws_labels[0])]
-                    affected_by_membrane.update(np.unique(ws_labels[ws_labels > 0]).tolist())
-                    tile_exp[ws_labels > 0] = ws_labels[ws_labels > 0]
-                    tile_exp[(ws_labels == 0) & (tile_nuc_slice == 0)] = 0
+                    paint = (ws_labels > 0) & (tile_exp > 0)
+                    reshaped = paint & (ws_labels != tile_exp)
+                    affected_by_membrane.update(np.unique(tile_exp[reshaped]).tolist())
+                    affected_by_membrane.update(np.unique(ws_labels[reshaped]).tolist())
+                    tile_exp[paint] = ws_labels[paint]
 
                     # Pass 2: detect membrane-only cells in unclaimed high-signal areas
                     if membrane_keep == 'yes':
@@ -432,6 +449,8 @@ def options(argv):
         help='"squareness" of the membrane, gradation between 0.001 and 0.999 : example -> -membrane_compactness=0.5')
     parser.add_argument('--membrane_keep', choices=['yes', 'no'], default='no',
         help='keep segmented membranes without nuclei : example -> -membrane_keep=no')
+    parser.add_argument('--membrane_min_growth', type=lambda s: 0.05 if s.strip() == '' else float(s), default=0.05,
+        help='minimum fractional area growth over the bare nucleus for a watershed cell to be trusted as membrane-guided (else the nuclei+expansion is kept) : example -> -membrane_min_growth=0.05')
     parser.add_argument('--custom_segmentation', default='',
         help='file path to a pre-made custom segmentation : example -> -custom_segmentation=/data/custom_seg.npy')
     parser.add_argument('--custom_segmentation_type', choices=['full', 'nuc', 'mem'], default='full',
@@ -458,6 +477,7 @@ if __name__ =='__main__':
     membrane_diameter = args.membrane_diameter
     membrane_compactness = args.membrane_compactness
     membrane_keep = args.membrane_keep
+    membrane_min_growth = args.membrane_min_growth
     custom_segmentation = args.custom_segmentation
     custom_segmentation_type = args.custom_segmentation_type
     measure_markers = sanitize_marker_list(args.measure_markers)
