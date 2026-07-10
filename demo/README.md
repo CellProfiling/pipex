@@ -1,6 +1,8 @@
 # PIPEX Demo Dataset
 
-This folder contains a complete demonstration dataset for **PIPEX**, together with the analysis outputs generated using the recommended workflow.
+This folder contains the files required to follow the **PIPEX** tutorial. The complete demonstration dataset, including all input files and analysis outputs generated using the recommended workflow, can be downloaded using the link below:
+
+https://ell-vault.stanford.edu/dav/public/PIPEX/demo/pipex_demo_pancreatic_cancer_core.zip
 
 The demo is intended for new users who would like to explore PIPEX before analyzing their own multiplexed imaging data.
 
