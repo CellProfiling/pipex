@@ -104,8 +104,18 @@ def upscale_results(df):
         df['size'] = df['size'].apply(lambda x: int(x * pipex_scale_factor_n2))
 
 
+def overlay_background(nuclei_img_orig, labels):
+    #nuclei image is not loaded when the custom segmentation already provides the full result; fall back to a black canvas
+    if nuclei_img_orig is None or nuclei_img_orig.shape[:2] != labels.shape[:2]:
+        return np.zeros(labels.shape[:2], dtype=np.uint8)
+    return nuclei_img_orig
+
+
 def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
-    if custom_segmentation == "" or custom_segmentation_type != "nuc":
+    #custom_segmentation_type is meaningless without a custom segmentation file (it defaults to "full"), so collapse both into one effective type
+    custom_type = custom_segmentation_type if custom_segmentation != "" else ""
+    #stardist is only needed when the nuclei are not already provided by the custom segmentation ("nuc" and "full" both provide them)
+    if custom_type in ("", "mem"):
         img_min = np.amin(nuclei_img_orig)
         img_range = np.amax(nuclei_img_orig) - img_min
         if img_range == 0:
@@ -153,12 +163,28 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
             log("Stardist expanded result image saved")
         else:
             sd_labels_expanded = sd_labels.copy()
-    else:
+    elif custom_type == "full":
+        #"full": the custom segmentation is the final result, quantification runs directly over it
         sd_labels_expanded = custom_img_orig
+    else:
+        #"nuc": the custom segmentation replaces the stardist nuclei, the membrane code can still refine it below.
+        #cast to a signed type because the membrane refinement uses negative temporary labels.
+        sd_labels = custom_img_orig.astype(np.int32)
+        if nuclei_expansion > 0:
+            sd_labels_expanded = expand_labels(sd_labels, distance=nuclei_expansion)
+            imsave(os.path.join(data_folder, "analysis", "quality_control", "custom_nuclei_result_expanded.jpg"), np.uint8(mark_boundaries(overlay_background(nuclei_img_orig, sd_labels_expanded), sd_labels_expanded) * 255))
+            log("Custom nuclei expanded result image saved")
+        else:
+            sd_labels_expanded = sd_labels.copy()
 
     affected_by_membrane = set()
-    if membrane_diameter > 0 or custom_segmentation_type == "mem":
-        if custom_segmentation == "" or custom_segmentation_type != "mem":
+    #"full" skips the membrane code entirely; "mem" always runs it (the custom mask replaces the watershed)
+    run_membrane = custom_type != "full" and (membrane_diameter > 0 or custom_type == "mem")
+    if run_membrane and custom_type != "mem" and membrane_img_orig is None:
+        print(">>> WARNING: no membrane image available, skipping membrane refinement", flush=True)
+        run_membrane = False
+    if run_membrane:
+        if custom_type != "mem":
             #if membrane marker is provided, run custom watershed segmentation
             mem_min = np.amin(membrane_img_orig)
             mem_range = np.amax(membrane_img_orig) - mem_min
@@ -285,7 +311,7 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                 ws_labels[nz] = lookup[ws_labels[nz]]
 
             imsave(os.path.join(data_folder, "analysis", "quality_control", "wathershed_result_merged_by_nuclei.jpg"),
-                   np.uint8(mark_boundaries(nuclei_img_orig, ws_labels) * 255))
+                   np.uint8(mark_boundaries(overlay_background(nuclei_img_orig, ws_labels), ws_labels) * 255))
             print(">>> Watershed preliminary nuclei filter result image saved =",
                   datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"), flush=True)
 
@@ -331,8 +357,9 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
                     rows, cols = np.where(filling_image > 0)
                     sd_labels_expanded[rows + bbox[0], cols + bbox[1]] = segment.label
 
-    del sd_labels
-    if custom_segmentation != "" and custom_segmentation_type == "full":
+    if 'sd_labels' in locals():
+        del sd_labels
+    if custom_type == "full":
         sd_labels_expanded = custom_img_orig
     else:
         sd_labels_expanded = relabel_sequential(sd_labels_expanded)[0]
@@ -340,10 +367,10 @@ def cell_segmentation(nuclei_img_orig, membrane_img_orig, custom_img_orig):
     np.save(os.path.join(data_folder, 'analysis', 'segmentation_data.npy'), sd_labels_expanded)
     log("Final joined segmentation result numpy binary data saved")
 
-    imsave(os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg"), np.uint8(mark_boundaries(nuclei_img_orig, sd_labels_expanded) * 255))
+    imsave(os.path.join(data_folder, "analysis", "segmentation_mask_show.jpg"), np.uint8(mark_boundaries(overlay_background(nuclei_img_orig, sd_labels_expanded), sd_labels_expanded) * 255))
     log("Final joined segmentation result image over nuclei saved")
 
-    black_canvas = np.zeros((len(nuclei_img_orig), len(nuclei_img_orig[0]), 3), dtype=np.uint8)
+    black_canvas = np.zeros((len(sd_labels_expanded), len(sd_labels_expanded[0]), 3), dtype=np.uint8)
     boundaries_rgb = np.uint8(mark_boundaries(black_canvas, sd_labels_expanded, color=(0, 1, 0)) * 255)
     boundaries_rgba = np.dstack([boundaries_rgb, np.where(boundaries_rgb.any(axis=2), 255, 0).astype(np.uint8)])
     imsave(os.path.join(data_folder, "analysis", "segmentation_boundaries.png"), boundaries_rgba)
@@ -503,19 +530,21 @@ if __name__ =='__main__':
     nuclei_img = None
     membrane_img = None
     custom_img = None
-    if custom_segmentation == "" or custom_segmentation_type != "full":
-        loaded = {}
-        def collect_images(marker, raw_img):
-            if marker == nuclei_marker:
-                loaded['nuclei'] = downscale_images(raw_img)
-            elif marker == membrane_marker:
-                loaded['membrane'] = downscale_images(raw_img)
+    #the marker images and the custom segmentation file are independent inputs: any custom segmentation type needs its file loaded
+    loaded = {}
+    def collect_images(marker, raw_img):
+        if marker == nuclei_marker:
+            loaded['nuclei'] = downscale_images(raw_img)
+        elif marker == membrane_marker:
+            loaded['membrane'] = downscale_images(raw_img)
 
-        markers_to_load = [m for m in [nuclei_marker, membrane_marker] if m]
+    markers_to_load = [m for m in [nuclei_marker, membrane_marker] if m]
+    if markers_to_load:
         iter_marker_images(data_folder, markers_to_load, collect_images)
         nuclei_img = loaded.get('nuclei')
         membrane_img = loaded.get('membrane')
-    else:
+
+    if custom_segmentation != "":
         try_image = False
         try:
             custom_img = downscale_images(np.load(os.path.join(data_folder, custom_segmentation)))
@@ -530,15 +559,15 @@ if __name__ =='__main__':
                 print('>>> ', e, flush=True)
 
     #performing segmentation
-    if custom_segmentation == "" or custom_segmentation_type != "full":
-        if nuclei_img is None:
-            print(">>> ERROR: nuclei marker '" + nuclei_marker + "' not found in data folder, cannot segment", flush=True)
-            sys.exit(1)
-        if membrane_marker != "" and membrane_img is None:
-            print(">>> WARNING: membrane marker '" + membrane_marker + "' not found in data folder, continuing without membrane refinement", flush=True)
-    elif custom_img is None:
+    if custom_segmentation != "" and custom_img is None:
         print(">>> ERROR: custom segmentation file '" + custom_segmentation + "' could not be loaded, cannot segment", flush=True)
         sys.exit(1)
+    #the nuclei image is only mandatory when stardist has to find the nuclei itself
+    if (custom_segmentation == "" or custom_segmentation_type == "mem") and nuclei_img is None:
+        print(">>> ERROR: nuclei marker '" + nuclei_marker + "' not found in data folder, cannot segment", flush=True)
+        sys.exit(1)
+    if membrane_marker != "" and membrane_img is None:
+        print(">>> WARNING: membrane marker '" + membrane_marker + "' not found in data folder, continuing without membrane refinement", flush=True)
     cellLabels, membraneAffected = cell_segmentation(nuclei_img, membrane_img, custom_img)
 
     del nuclei_img
